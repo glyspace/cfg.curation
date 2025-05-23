@@ -23,8 +23,6 @@ public class Biological {
 	String tissue;
 	@Column
 	String disease;
-	@Column
-	String carb_key;
 	
 	public String getId() {
 		return id;
@@ -67,11 +65,5 @@ public class Biological {
 	}
 	public void setDisease(String disease) {
 		this.disease = disease;
-	}
-	public String getCarb_key() {
-		return carb_key;
-	}
-	public void setCarb_key(String carb_key) {
-		this.carb_key = carb_key;
 	}
 }

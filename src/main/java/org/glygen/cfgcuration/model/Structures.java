@@ -16,6 +16,9 @@ public class Structures {
 	String linearcode;
 	@Column(length=4000)
 	String iupac;
+	@Column
+	String carb_key;
+	
 	public String getId() {
 		return id;
 	}
@@ -40,5 +43,10 @@ public class Structures {
 	public void setIupac(String iupac) {
 		this.iupac = iupac;
 	}
-
+	public String getCarb_key() {
+		return carb_key;
+	}
+	public void setCarb_key(String carb_key) {
+		this.carb_key = carb_key;
+	}
 }
