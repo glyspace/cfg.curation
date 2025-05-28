@@ -6,9 +6,11 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -22,6 +24,7 @@ import org.glygen.cfgcuration.dao.MappingSpeciesRepository;
 import org.glygen.cfgcuration.dao.MappingTissueRepository;
 import org.glygen.cfgcuration.dao.PublicationRepository;
 import org.glygen.cfgcuration.dao.StructureRepository;
+import org.glygen.cfgcuration.model.Biological;
 import org.glygen.cfgcuration.model.NamespaceEntry;
 import org.glygen.cfgcuration.model.Publication;
 import org.glygen.cfgcuration.model.Species;
@@ -150,6 +153,7 @@ public class CFGCurationService {
 	        Document doc = dBuilder.parse(inputFile);
 	        doc.getDocumentElement().normalize();
 	
+	        List <Publication> created = new ArrayList<>();
 	        NodeList nList = doc.getElementsByTagName("DATA_RECORD");
 	        for (int temp = 0; temp < nList.getLength(); temp++) {
             	Node nNode = nList.item(temp);
@@ -177,8 +181,10 @@ public class CFGCurationService {
                     if (n8 != null && n8.getLength() > 0) pub.setJournalIdType(n8.item(0).getTextContent());
                     if (n9 != null && n9.getLength() > 0) pub.setAuthor(n9.item(0).getTextContent());
                     if (n10 != null && n10.getLength() > 0) pub.setVolume(n10.item(0).getTextContent());
-                    publicationRepository.save(pub);
-
+                    if (!created.contains(pub)) {
+                    	created.add(pub);
+                    	publicationRepository.save(pub);
+                    }
                 }
 	        }
 	        
@@ -204,41 +210,104 @@ public class CFGCurationService {
 		
 		c = mappingTissueRepository.count();
 		if (c == 0) {
+			Set<String> alreadyAdded = new HashSet<>();
+			Map <String, Integer> counts = new HashMap<>();
 			List<String> distinctValues = bioRepository.findDistinctTissue();
 			for (String name: distinctValues) {
-				long count = bioRepository.countByTissueIgnoreCase(name);
-				MappingTissue mapping = new MappingTissue();
-				mapping.setCount(Long.valueOf(count).intValue());
-				mapping.setName(name);
-				
-				mappingTissueRepository.save(mapping);
+				if (name != null) {
+					String[] multiple = name.split(",");
+					for (String n: multiple) {
+						if (!alreadyAdded.contains(n.trim())) {
+							alreadyAdded.add(n.trim());
+							MappingTissue mapping = new MappingTissue();
+							mapping.setName(n.trim());
+							mappingTissueRepository.save(mapping);
+						}
+						if (counts.get(n.trim()) == null) {
+							counts.put(n.trim(), 1);
+						} else {
+							counts.put(n.trim(), counts.get(n.trim()) + 1);
+						}
+					}
+				}
+			}
+			
+			List<MappingTissue> mappings = mappingTissueRepository.findAll();
+			for (MappingTissue mapping: mappings) {
+				Integer count = counts.get(mapping.getName());
+				if (count != null) {
+					mapping.setCount(count);
+					mappingTissueRepository.save(mapping);
+				}
 			}
 		}
 		
 		c = mappingOrganRepository.count();
 		if (c == 0) {
+			Set<String> alreadyAdded = new HashSet<>();
+			Map <String, Integer> counts = new HashMap<>();
 			List<String> distinctValues = bioRepository.findDistinctOrgan();
 			for (String name: distinctValues) {
-				long count = bioRepository.countByOrganIgnoreCase(name);
-				MappingOrgan mapping = new MappingOrgan();
-				mapping.setCount(Long.valueOf(count).intValue());
-				mapping.setName(name);
-				
-				mappingOrganRepository.save(mapping);
+				if (name != null) {
+					String[] multiple = name.split(",");
+					for (String n: multiple) {
+						if (!alreadyAdded.contains(n.trim())) {
+							alreadyAdded.add(n.trim());
+							MappingOrgan mapping = new MappingOrgan();
+							mapping.setName(n.trim());
+							
+							mappingOrganRepository.save(mapping);
+						}
+						if (counts.get(n.trim()) == null) {
+							counts.put(n.trim(), 1);
+						} else {
+							counts.put(n.trim(), counts.get(n.trim()) + 1);
+						}
+					}
+				}
+			}
+			List<MappingOrgan> mappings = mappingOrganRepository.findAll();
+			for (MappingOrgan mapping: mappings) {
+				Integer count = counts.get(mapping.getName());
+				if (count != null) {
+					mapping.setCount(count);
+					mappingOrganRepository.save(mapping);
+				}
 			}
 		}
 		
 		c = mappingDiseaseRepository.count();
 		if (c == 0) {
+			Set<String> alreadyAdded = new HashSet<>();
+			Map <String, Integer> counts = new HashMap<>();
 			List<String> distinctValues = bioRepository.findDistinctDisease();
 			for (String name: distinctValues) {
-				long count = bioRepository.countByDiseaseIgnoreCase(name);
-				MappingDisease mapping = new MappingDisease();
-				mapping.setCount(Long.valueOf(count).intValue());
-				mapping.setName(name);
-				
-				mappingDiseaseRepository.save(mapping);
+				if (name != null) {
+					String[] multiple = name.split(",");
+					for (String n: multiple) {
+						if (!alreadyAdded.contains(n.trim())) {
+							alreadyAdded.add(n.trim());
+							MappingDisease mapping = new MappingDisease();
+							mapping.setName(n.trim());
+							mappingDiseaseRepository.save(mapping);
+						}
+						if (counts.get(n.trim()) == null) {
+							counts.put(n.trim(), 1);
+						} else {
+							counts.put(n.trim(), counts.get(n.trim()) + 1);
+						}
+					}
+				}
 			}
+			List<MappingDisease> mappings = mappingDiseaseRepository.findAll();
+			for (MappingDisease mapping: mappings) {
+				Integer count = counts.get(mapping.getName());
+				if (count != null) {
+					mapping.setCount(count);
+					mappingDiseaseRepository.save(mapping);
+				}
+			}
+			
 		}
 	}
 	
@@ -374,5 +443,122 @@ public class CFGCurationService {
 		}
 		
 		return matches;
+	}
+	
+	public void findRecordsWithMultiples () {
+		List<String> multi = new ArrayList<>();
+		List<Biological> records = bioRepository.findAll();
+		for (Biological rec: records) {
+			String disease = rec.getDisease();
+			String tissue = rec.getTissue();
+			String organ = rec.getOrgan();
+			boolean multipleDisease = false;
+			boolean multipleTissue = false;
+			boolean multipleOrgan = false;
+			
+			if (disease != null && disease.contains(",")) {
+				multipleDisease = true;
+			}
+			
+			if (tissue != null && tissue.contains(",")) {
+				multipleTissue = true;
+			}
+			
+			if (organ != null && organ.contains(",")) {
+				multipleOrgan = true;
+			}
+			
+			if ((multipleDisease && multipleTissue) || 
+					(multipleTissue && multipleOrgan) ||
+					(multipleDisease && multipleOrgan)) {
+				multi.add(rec.getCarb_id());
+			}
+		}
+		
+		logger.info ("Records with multiple multi values: " + multi.toString());
+	}
+	
+	public void addPMIDs () {
+		// add pmids
+		PubmedUtil util = new PubmedUtil(apiKey);
+		// go through existing ones and assign pmid if not assigned
+		List<Publication> allPublications = publicationRepository.findAll();
+		for (Publication pub: allPublications) {
+			if (pub.getPmid() == null || pub.getPmid().isEmpty()) {
+				// check Pubmed to see if we can get the pmid
+				try {
+					if (pub.getChecked() == null || !pub.getChecked()) {
+						List<Publication> matches = util.getPublicationByTitle(pub.getTitle());
+						pub.setMatchCount(matches.size()+"");
+						if (!matches.isEmpty()) {
+							for (Publication m: matches) {
+								if (m.equals(pub)) {
+									pub.setPmid(m.getPmid());
+									pub.setDoiId(m.getDoiId());
+									break;
+								} 
+							}
+							if (pub.getPmid() == null) {
+								// check if we have pmid in journalid column
+								if (pub.getJournalIdType() != null && pub.getJournalIdType().equalsIgnoreCase("PubMed")) {
+									if (pub.getJournalId() != null) {
+										pub.setPmid(pub.getJournalId());
+										pub.setMatchDetails("Used journalid value as pmid");
+										pub.setChecked(true);
+									}
+								}
+								if (matches.size() == 1 && (pub.getChecked() == null || !pub.getChecked())) {
+									Publication m = matches.get(0);
+									if (m.getTitle() != null && m.getTitle().equalsIgnoreCase(pub.getTitle())) {
+										pub.setMatchDetails("Title matched, ");
+										if (m.getAuthor() != null && m.getAuthor().equalsIgnoreCase(pub.getAuthor())) {
+											pub.setMatchDetails(pub.getMatchDetails() + "Authors matched, ");
+										} else {
+											pub.setMatchDetails(pub.getMatchDetails() + " Authors did not match: " + m.getAuthor() + ",");
+										}
+										if (m.getJournalName() != null && m.getJournalName().equalsIgnoreCase(pub.getJournalName())) {
+											pub.setMatchDetails(pub.getMatchDetails() + "Journal matched, ");
+											if (m.getYear() != null && m.getYear().equalsIgnoreCase(pub.getYear())) {
+												pub.setMatchDetails(pub.getMatchDetails() + "Year matched, ");
+												if (m.getPageRange() != null && m.getPageRange().equalsIgnoreCase(pub.getPageRange())) {
+													pub.setMatchDetails(pub.getMatchDetails() + "Page range matched, ");
+												} else {
+													pub.setMatchDetails(pub.getMatchDetails() + "Page range did not match: " + m.getPageRange() + " ");
+												}
+											} else {
+												pub.setMatchDetails(pub.getMatchDetails() + "Year did not match: " + m.getYear() + " ");
+											}
+										} else {
+											pub.setMatchDetails(pub.getMatchDetails() + " Journal name did not match: " + m.getJournalName() + ", ");
+										}
+										pub.setMatchDetails(pub.getMatchDetails().trim());
+									}
+								} else {
+									pub.setMatchDetails("Multiple matches");
+								}
+							} 
+						} else {
+							// check if we have pmid in journalid column
+							if (pub.getJournalIdType() != null && pub.getJournalIdType().equalsIgnoreCase("PubMed")) {
+								if (pub.getJournalId() != null) {
+									pub.setPmid(pub.getJournalId());
+									pub.setMatchDetails("Used journalid value as pmid");
+								}
+							}
+						}
+						pub.setChecked(true);
+						publicationRepository.save(pub);
+						
+						try {
+					        Thread.sleep(100); // wait 100 milliseconds between requests
+					    } catch (InterruptedException e) {
+					        Thread.currentThread().interrupt(); // restore interrupted status
+					    }
+					}
+				} catch (IOException e) {
+					logger.error("Error getting publication from PubMed", e);
+				}
+			}
+		}
 	}
 }

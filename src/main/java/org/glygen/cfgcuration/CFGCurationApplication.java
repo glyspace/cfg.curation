@@ -26,8 +26,10 @@ public class CFGCurationApplication {
 		NamespaceHandler.loadNamespaces();
 		
 		//service.assignCarbKeys();
+		//service.findRecordsWithMultiples();
 		service.createPublications();
-		service.createMappingTables();
-		service.addInformationToMappingTables();
+		//service.createMappingTables();
+		//service.addInformationToMappingTables();
+		service.addPMIDs();
 	}
 }

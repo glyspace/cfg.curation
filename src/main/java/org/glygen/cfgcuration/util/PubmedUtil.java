@@ -39,7 +39,7 @@ public class PubmedUtil {
 	static String ncbiTaxUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=taxonomy&retmode=json&term=";
 	static String ncbiFetchUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=taxonomy&retmode=xml&id=";
 	
-	/*public List<Publication> getPublicationByTitle (String title) throws IOException {
+	public List<Publication> getPublicationByTitle (String title) throws IOException {
 		List<Publication> results = new ArrayList<>();
 		
 		title = title.replaceAll("\n", " ");
@@ -74,9 +74,9 @@ public class PubmedUtil {
 	        }
 		} 
 		return results;
-	}*/
+	}
 	
-	/*public Publication getPublicatonByPMID (String pmid) throws IOException {
+	public Publication getPublicatonByPMID (String pmid) throws IOException {
 		String apiUrl = fetchUrl + pmid;
 		if (apiKey != null) {
 			apiUrl += "&api_key=" + apiKey;
@@ -116,39 +116,34 @@ public class PubmedUtil {
                 }
                 pub.setTitle(title);
                 
-                String journalString = "";
-
                 // Journal
                 String journal = article.getElementsByTagName("ISOAbbreviation").item(0).getTextContent();
-                journalString += journal;
+                if (journal != null) 
+                	pub.setJournalName(journal);
+                
 
                 // Publication Date
                 Element pubDate = (Element) article.getElementsByTagName("PubDate").item(0);
                 Element year = (Element) pubDate.getElementsByTagName("Year").item(0);
                 if (year != null) {
-                	 journalString += " (" + year.getTextContent() + ")";
+                	pub.setYear(year.getTextContent());
                 }
-               
                 
                 // Inside your existing loop over PubmedArticle
                 Element journalIssue = (Element) article.getElementsByTagName("JournalIssue").item(0);
                 String volume = getTagValue(journalIssue, "Volume");
-                String issue = getTagValue(journalIssue, "Issue");
-                
                 if (volume != null) {
-                	journalString += " " + volume;
+                	pub.setVolume(volume);
                 }
-
+                
                 Element pagination = (Element) article.getElementsByTagName("Pagination").item(0);
                 if (pagination != null) {
                 	String start = getTagValue(pagination, "StartPage");
                 	String end = getTagValue(pagination, "EndPage");
                 	if (start != null && end != null) {
-                		journalString += ": " + start + "-" + end;
-                	}
-                	
+                		pub.setPageRange(start+"-"+ end);
+                	}	
                 }
-                pub.setJournal(journalString);
                 
                 // Authors
                 NodeList authors = article.getElementsByTagName("Author");
@@ -171,7 +166,6 @@ public class PubmedUtil {
         	throw new IOException (e);
         }
 	}
-	*/
 	
     private static String getTagValue(Element parent, String tagName) {
 	    NodeList list = parent.getElementsByTagName(tagName);

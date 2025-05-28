@@ -40,6 +40,17 @@ public class Publication {
 	@Column
 	String volume;
 	
+	@Column
+	String pmid;
+	@Column
+	String doiId;
+	@Column
+	Boolean checked;
+	@Column
+	String matchCount;
+	@Column(length=4000)
+	String matchDetails;
+	
 	
 	public Long getId() {
 		return id;
@@ -106,5 +117,91 @@ public class Publication {
 	}
 	public void setJournalIdType(String journalIdType) {
 		this.journalIdType = journalIdType;
+	}
+	public String getPmid() {
+		return pmid;
+	}
+	public void setPmid(String pmid) {
+		this.pmid = pmid;
+	}
+	public String getDoiId() {
+		return doiId;
+	}
+	public void setDoiId(String doiId) {
+		this.doiId = doiId;
+	}
+	public Boolean getChecked() {
+		return checked;
+	}
+	public void setChecked(Boolean checked) {
+		this.checked = checked;
+	}
+	public String getMatchCount() {
+		return matchCount;
+	}
+	public void setMatchCount(String matchCount) {
+		this.matchCount = matchCount;
+	}
+	public String getMatchDetails() {
+		return matchDetails;
+	}
+	public void setMatchDetails(String matchDetails) {
+		this.matchDetails = matchDetails;
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		if (obj instanceof Publication) {
+			if (title != null && title.equalsIgnoreCase(((Publication) obj).getTitle())) {
+				if (author != null) {
+					if (author.equalsIgnoreCase(((Publication) obj).getAuthor())) {
+						if (journalName != null) {
+							if (journalName.equalsIgnoreCase(((Publication) obj).getJournalName())) {
+								if (year != null) {
+									if (year.equalsIgnoreCase(((Publication) obj).getYear())) {
+										if (pageRange != null) {
+											return pageRange.equalsIgnoreCase(((Publication) obj).getPageRange());
+										} else {
+											return true;
+										}
+									}
+								} else {
+									return true;
+								}
+							}
+						}
+						else {
+							return true;
+						}
+					}
+				} else {
+					if (journalName != null) {
+						if (journalName.equalsIgnoreCase(((Publication) obj).getJournalName())) {
+							if (year != null) {
+								if (year.equalsIgnoreCase(((Publication) obj).getYear())) {
+									if (pageRange != null) {
+										return pageRange.equalsIgnoreCase(((Publication) obj).getPageRange());
+									} else {
+										return true;
+									}
+								}
+							} else {
+								return true;
+							}
+						}
+					}
+					else {
+						return true;
+					}
+				}
+			}
+		}
+		return super.equals(obj);
+	}
+	
+	@Override
+	public int hashCode() {
+		String pub = title+author+journalName+year+pageRange;
+		return pub.hashCode();
 	}
 }
