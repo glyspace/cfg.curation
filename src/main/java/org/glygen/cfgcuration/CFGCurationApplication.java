@@ -30,7 +30,8 @@ public class CFGCurationApplication {
 		//service.createPublications();
 		//service.createMappingTables();
 		//service.addInformationToMappingTables();
+		service.addPMIDs();
 		service.generateExcelFiles();
-		//service.addPMIDs();
+		
 	}
 }
