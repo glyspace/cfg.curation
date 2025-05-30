@@ -2,6 +2,7 @@ package org.glygen.cfgcuration.service;
 
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -16,6 +17,18 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.apache.commons.collections4.trie.PatriciaTrie;
+import org.apache.poi.common.usermodel.HyperlinkType;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.CreationHelper;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.Hyperlink;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFFont;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.glygen.cfgcuration.NamespaceHandler;
 import org.glygen.cfgcuration.dao.BiologicalRepository;
 import org.glygen.cfgcuration.dao.MappingDiseaseRepository;
@@ -510,7 +523,7 @@ public class CFGCurationService {
 								if (matches.size() == 1 && (pub.getChecked() == null || !pub.getChecked())) {
 									Publication m = matches.get(0);
 									if (m.getTitle() != null && m.getTitle().equalsIgnoreCase(pub.getTitle())) {
-										pub.setMatchDetails("Title matched, ");
+										pub.setMatchDetails("Single Match: " + m.getPmid() + "; Title matched, ");
 										if (m.getAuthor() != null && m.getAuthor().equalsIgnoreCase(pub.getAuthor())) {
 											pub.setMatchDetails(pub.getMatchDetails() + "Authors matched, ");
 										} else {
@@ -560,5 +573,276 @@ public class CFGCurationService {
 				}
 			}
 		}
+	}
+
+	public void generateExcelFiles () {
+		
+		// Tissue mappings
+		List<String[]> rows = new ArrayList<>();
+		List<MappingTissue> allRows = mappingTissueRepository.findAll();
+		Map<Long, List<String>> recordMap = new HashMap<>();
+		String[] header = {"ID", "count", "name", "namespacename", "namespaceid", "mappingname", "rank", "matchCount"};
+		rows.add(header);
+		for (MappingTissue m: allRows) {
+			if (m.getNamespaceName() == null) {
+				String[] row = new String[8];
+				row[0] = m.getId()+"";
+				row[1] = m.getCount()+ "";
+				row[2] = m.getName();
+				row[7] = m.getMatchCount() + "";
+				// find records with this value
+				List<Biological> bsList = bioRepository.findByTissueIgnoreCase(m.getName());
+				Set<String> recordList = new HashSet<>();
+				for (Biological bs: bsList) {
+					String cc = bs.getCarb_id();
+					recordList.add(cc);
+				}
+				recordMap.put(m.getId(), new ArrayList<>(recordList));
+				rows.add(row);
+			}
+		}
+		List<String[]> recordRows = new ArrayList<>();
+		String[] rHeader = {"ID", "CC Number"};
+		recordRows.add(rHeader);
+		for (Long id: recordMap.keySet()) {
+			List<String> records = recordMap.get(id);
+			for (String cc: records) {
+				String[] row = new String[2];
+				row[0] = id+"";
+				row[1] = cc;
+				recordRows.add(row);
+			}
+		}
+		try {
+			writeToExcel (rows, "mapping_Tissue.xlsx", recordRows);
+		} catch (IOException e1) {
+			logger.error("Error generating Excel file for Tissues", e1);
+		}
+		
+		// Scientific Name Mappings
+		recordMap = new HashMap<>();
+		rows = new ArrayList<>();
+		List<MappingScientificName> allSpecies = mappingSpeciesRepository.findAll();
+		rows.add(header);
+		for (MappingScientificName m: allSpecies) {
+			if (m.getNamespaceName() == null) {
+				String[] row = new String[8];
+				row[0] = m.getId()+"";
+				row[1] = m.getCount()+ "";
+				row[2] = m.getName();
+				row[7] = m.getMatchCount() + "";
+				// find records with this value
+				List<Biological> bsList = bioRepository.findByScientificnameIgnoreCase(m.getName());
+				Set<String> recordList = new HashSet<>();
+				for (Biological bs: bsList) {
+					String cc = bs.getCarb_id();
+					recordList.add(cc);
+				}
+				recordMap.put(m.getId(), new ArrayList<>(recordList));
+				rows.add(row);
+			}
+		}
+		recordRows = new ArrayList<>();
+		recordRows.add(rHeader);
+		for (Long id: recordMap.keySet()) {
+			List<String> records = recordMap.get(id);
+			for (String cc: records) {
+				String[] row = new String[2];
+				row[0] = id+"";
+				row[1] = cc;
+				recordRows.add(row);
+			}
+		}
+		try {
+			writeToExcel (rows, "mapping_ScientificName.xlsx", recordRows);
+		} catch (IOException e1) {
+			logger.error("Error generating Excel file for Species", e1);
+		}
+		
+		// Disease Name Mappings
+		recordMap = new HashMap<>();
+		rows = new ArrayList<>();
+		List<MappingDisease> allDisease = mappingDiseaseRepository.findAll();
+		rows.add(header);
+		for (MappingDisease m: allDisease) {
+			if (m.getNamespaceName() == null) {
+				String[] row = new String[8];
+				row[0] = m.getId()+"";
+				row[1] = m.getCount()+ "";
+				row[2] = m.getName();
+				row[7] = m.getMatchCount() + "";
+				// find records with this value
+				List<Biological> bsList = bioRepository.findByDiseaseIgnoreCase(m.getName());
+				Set<String> recordList = new HashSet<>();
+				for (Biological bs: bsList) {
+					String cc = bs.getCarb_id();
+					recordList.add(cc);
+				}
+				recordMap.put(m.getId(), new ArrayList<>(recordList));
+				rows.add(row);
+			}
+		}
+		recordRows = new ArrayList<>();
+		recordRows.add(rHeader);
+		for (Long id: recordMap.keySet()) {
+			List<String> records = recordMap.get(id);
+			for (String cc: records) {
+				String[] row = new String[2];
+				row[0] = id+"";
+				row[1] = cc;
+				recordRows.add(row);
+			}
+		}
+		try {
+			writeToExcel (rows, "mapping_Disease.xlsx", recordRows);
+		} catch (IOException e1) {
+			logger.error("Error generating Excel file for Diseases", e1);
+		}
+			
+			
+		// Organ Mappings
+		recordMap = new HashMap<>();
+		rows = new ArrayList<>();
+		List<MappingOrgan> allOrgans = mappingOrganRepository.findAll();
+		rows.add(header);
+		for (MappingOrgan m: allOrgans) {
+			if (m.getNamespaceName() == null) {
+				String[] row = new String[8];
+				row[0] = m.getId()+"";
+				row[1] = m.getCount()+ "";
+				row[2] = m.getName();
+				row[7] = m.getMatchCount() + "";
+				// find records with this value
+				List<Biological> bsList = bioRepository.findByOrganIgnoreCase(m.getName());
+				Set<String> recordList = new HashSet<>();
+				for (Biological bs: bsList) {
+					String cc = bs.getCarb_id();
+					recordList.add(cc);
+				}
+				recordMap.put(m.getId(), new ArrayList<>(recordList));
+				rows.add(row);
+			}
+		}
+		recordRows = new ArrayList<>();
+		recordRows.add(rHeader);
+		for (Long id: recordMap.keySet()) {
+			List<String> records = recordMap.get(id);
+			for (String cc: records) {
+				String[] row = new String[2];
+				row[0] = id+"";
+				row[1] = cc;
+				recordRows.add(row);
+			}
+		}
+		try {
+			writeToExcel (rows, "mapping_Organ.xlsx", recordRows);
+		} catch (IOException e1) {
+			logger.error("Error generating Excel file for Organs", e1);
+		}
+		
+		// publications
+		rows = new ArrayList<>();
+		List<Publication> allPublications = publicationRepository.findAll();
+		//Map<Long, List<String>> recordMap = new HashMap<>();
+		String[] header2 = {"ID", "Carb Key", "Title", "Authors", "Journal Name", "Year", "Page Range", "PMID", "DOI", "Match Details", "Journal Key", "Journal ID", "Journal ID Type"};
+		rows.add(header2);
+		for (Publication m: allPublications) {
+			if (m.getPmid() == null) {
+				String[] row = new String[13];
+				row[0] = m.getId() +"";
+				row[1] = m.getCarbKey();
+				row[2] = m.getTitle();
+				row[3] = m.getAuthor();
+				row[4] = m.getJournalName();
+				row[5] = m.getYear();
+				row[6] = m.getPageRange();
+				row[9] = m.getMatchDetails();
+				row[10] = m.getJournalKey();
+				row[11] = m.getJournalId();
+				row[12] = m.getJournalIdType();
+				rows.add(row);
+			}
+		}
+		
+		try {
+			writeToExcel (rows, "cfg_Publication.xlsx", null);
+		} catch (IOException e1) {
+			logger.error("Error generating Excel file for Publications", e1);
+		}
+		
+	}
+	
+	public void writeToExcel (List<String[]> rows, String filename, List<String[]> records) throws IOException {
+		FileOutputStream excelWriter = new FileOutputStream(filename);
+		Workbook workbook = new XSSFWorkbook();
+		
+        XSSFFont font= (XSSFFont) workbook.createFont();
+        font.setBold(true);
+        font.setItalic(false);
+        CellStyle boldStyle = workbook.createCellStyle();
+        boldStyle.setFont(font);
+        
+        Sheet sheet = workbook.createSheet("Mappings");
+        CellStyle wrapTextStyle = workbook.createCellStyle();
+        wrapTextStyle.setWrapText(true);
+        
+        CreationHelper createHelper = workbook.getCreationHelper();
+        
+
+        CellStyle hlinkStyle = workbook.createCellStyle();
+        XSSFFont hlinkFont= (XSSFFont) workbook.createFont();
+        hlinkFont.setUnderline(Font.U_SINGLE);
+        hlinkFont.setColor(IndexedColors.BLUE.getIndex());
+        hlinkStyle.setFont(hlinkFont);
+        
+        // first row is the header row
+        if (rows.size() > 0) {
+        	String[] headerRow = rows.get(0);
+        	Row header = sheet.createRow(0);
+        	int i=0;
+        	for (String col: headerRow) {
+        		Cell cell = header.createCell(i++);
+        		cell.setCellValue(col);
+        		cell.setCellStyle(boldStyle);
+        	}
+        	
+        	for (i=1; i< rows.size(); i++) {
+        		String[] row = rows.get(i);
+        		Row entry = sheet.createRow(i);
+        		int j=0;
+        		for (String col: row) {
+        			Cell cell = entry.createCell(j++);
+        			cell.setCellStyle(wrapTextStyle);
+    				cell.setCellValue(col);
+           		}
+        	}
+        }
+        
+        if (records != null && !records.isEmpty()) {
+        	Sheet recordsSheet = workbook.createSheet("records");
+        	String[] headerRow = records.get(0);
+        	Row header = recordsSheet.createRow(0);
+        	int i=0;
+        	for (String col: headerRow) {
+        		Cell cell = header.createCell(i++);
+        		cell.setCellValue(col);
+        		cell.setCellStyle(boldStyle);
+        	}
+        	
+        	for (i=1; i< records.size(); i++) {
+        		String[] row = records.get(i);
+        		Row entry = recordsSheet.createRow(i);
+        		int j=0;
+        		for (String col: row) {
+        			Cell cell = entry.createCell(j++);
+    				cell.setCellValue(col);
+        		}
+        	}
+        	
+        }
+        
+        workbook.write(excelWriter);
+        excelWriter.close();
+        workbook.close();
 	}
 }

@@ -21,5 +21,10 @@ public interface BiologicalRepository extends JpaRepository<Biological, String> 
 	long countByTissueIgnoreCase (String name);
 	long countByOrganIgnoreCase (String name);
 	long countByDiseaseIgnoreCase (String name);
+	
+	List<Biological> findByScientificnameIgnoreCase (String name);
+	List<Biological> findByTissueIgnoreCase (String name);
+	List<Biological> findByOrganIgnoreCase (String name);
+	List<Biological> findByDiseaseIgnoreCase (String name);
 
 }

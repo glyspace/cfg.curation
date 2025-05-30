@@ -27,9 +27,10 @@ public class CFGCurationApplication {
 		
 		//service.assignCarbKeys();
 		//service.findRecordsWithMultiples();
-		service.createPublications();
+		//service.createPublications();
 		//service.createMappingTables();
 		//service.addInformationToMappingTables();
-		service.addPMIDs();
+		service.generateExcelFiles();
+		//service.addPMIDs();
 	}
 }
