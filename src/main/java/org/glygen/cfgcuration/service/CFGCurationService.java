@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Map.Entry;
 import java.util.Set;
 
@@ -42,6 +43,7 @@ import org.glygen.cfgcuration.model.NamespaceEntry;
 import org.glygen.cfgcuration.model.Publication;
 import org.glygen.cfgcuration.model.Species;
 import org.glygen.cfgcuration.model.Structures;
+import org.glygen.cfgcuration.model.mapping.Mapping;
 import org.glygen.cfgcuration.model.mapping.MappingDisease;
 import org.glygen.cfgcuration.model.mapping.MappingOrgan;
 import org.glygen.cfgcuration.model.mapping.MappingScientificName;
@@ -92,6 +94,68 @@ public class CFGCurationService {
 		this.mappingTissueRepository = mappingTissueRepository;
 		this.mappingSpeciesRepository = mappingSpeciesRepository;
 		this.mappingOrganRepository = mappingOrganRepository;
+	}
+	
+	@Transactional
+	public void updateMappings (List<Mapping> mappings, String tablename) {
+		PubmedUtil util = new PubmedUtil(apiKey);
+		for (Mapping mapping: mappings) {
+			if (tablename.equalsIgnoreCase("mapping_scientificname")) {
+				try {
+					Species species = util.getSpeciesByID(mapping.getNamespaceId());
+					Optional<MappingScientificName> record = mappingSpeciesRepository.findById(mapping.getId());
+					if (record.isPresent()) {
+						MappingScientificName existing = record.get();
+						if (!existing.getName().equalsIgnoreCase(species.getName())) {
+							existing.setMappingName(existing.getName());
+						}
+						existing.setInProgress(mapping.getInProgress());
+						existing.setNamespaceId(mapping.getNamespaceId());
+						existing.setNamespaceName(species.getName());
+						existing.setRank(species.getRank());
+						mappingSpeciesRepository.save(existing);
+					}
+				} catch (IOException e) {
+					logger.error("Could not retrive species from NCBI Taxonomy for: " + mapping.getNamespaceId(), e);
+				}
+			} else if (tablename.equalsIgnoreCase("mapping_disease")) {
+				//TODO find the canonical form etc from the dictionary, not from the mapping
+				Optional<MappingDisease> record = mappingDiseaseRepository.findById(mapping.getId());
+				if (record.isPresent()) {
+					MappingDisease existing = record.get();
+					existing.setInProgress(mapping.getInProgress());
+					existing.setMappingName(mapping.getMappingName());
+					existing.setNamespaceId(mapping.getNamespaceId());
+					existing.setNamespaceName(mapping.getNamespaceName());
+					mappingDiseaseRepository.save(existing);
+				}
+			} else if (tablename.equalsIgnoreCase("mapping_tissue")) {
+				//TODO find the canonical form etc from the dictionary, not from the mapping
+				Optional<MappingTissue> record = mappingTissueRepository.findById(mapping.getId());
+				if (record.isPresent()) {
+					MappingTissue existing = record.get();
+					existing.setInProgress(mapping.getInProgress());
+					existing.setMappingName(mapping.getMappingName());
+					existing.setNamespaceId(mapping.getNamespaceId());
+					existing.setNamespaceName(mapping.getNamespaceName());
+					mappingTissueRepository.save(existing);
+				}
+			} else if (tablename.equalsIgnoreCase("mapping_organ")) {
+				//TODO find the canonical form etc from the dictionary, not from the mapping
+				Optional<MappingOrgan> record = mappingOrganRepository.findById(mapping.getId());
+				if (record.isPresent()) {
+					MappingOrgan existing = record.get();
+					existing.setInProgress(mapping.getInProgress());
+					existing.setMappingName(mapping.getMappingName());
+					existing.setNamespaceId(mapping.getNamespaceId());
+					existing.setNamespaceName(mapping.getNamespaceName());
+					mappingOrganRepository.save(existing);
+				}
+			} else {
+				logger.error("Comparison of " + tablename + " has not been implemented yet!");
+			}
+		}
+		
 	}
 	
 	public void assignCarbKeys () {
@@ -524,7 +588,7 @@ public class CFGCurationService {
 									Publication m = matches.get(0);
 									if (m.getTitle() != null && m.getTitle().equalsIgnoreCase(pub.getTitle())) {
 										pub.setMatchDetails("Single Match: " + m.getPmid() + "; Title matched, ");
-										if (m.getAuthor() != null && m.getAuthor().equalsIgnoreCase(pub.getAuthor())) {
+										if (m.authorMatch(pub.getAuthor())) {
 											pub.setMatchDetails(pub.getMatchDetails() + "Authors matched, ");
 										} else {
 											pub.setMatchDetails(pub.getMatchDetails() + " Authors did not match: " + m.getAuthor() + ",");
@@ -614,7 +678,7 @@ public class CFGCurationService {
 			}
 		}
 		try {
-			writeToExcel (rows, "mapping_Tissue.xlsx", recordRows);
+			writeToExcel (rows, "Mappings", "mapping_Tissue.xlsx", recordRows, "records");
 		} catch (IOException e1) {
 			logger.error("Error generating Excel file for Tissues", e1);
 		}
@@ -654,7 +718,7 @@ public class CFGCurationService {
 			}
 		}
 		try {
-			writeToExcel (rows, "mapping_ScientificName.xlsx", recordRows);
+			writeToExcel (rows, "Mappings", "mapping_ScientificName.xlsx", recordRows, "records");
 		} catch (IOException e1) {
 			logger.error("Error generating Excel file for Species", e1);
 		}
@@ -694,7 +758,7 @@ public class CFGCurationService {
 			}
 		}
 		try {
-			writeToExcel (rows, "mapping_Disease.xlsx", recordRows);
+			writeToExcel (rows, "Mappings", "mapping_Disease.xlsx", recordRows, "records");
 		} catch (IOException e1) {
 			logger.error("Error generating Excel file for Diseases", e1);
 		}
@@ -735,7 +799,7 @@ public class CFGCurationService {
 			}
 		}
 		try {
-			writeToExcel (rows, "mapping_Organ.xlsx", recordRows);
+			writeToExcel (rows, "Mappings", "mapping_Organ.xlsx", recordRows, "records");
 		} catch (IOException e1) {
 			logger.error("Error generating Excel file for Organs", e1);
 		}
@@ -765,14 +829,14 @@ public class CFGCurationService {
 		}
 		
 		try {
-			writeToExcel (rows, "cfg_Publication.xlsx", null);
+			writeToExcel (rows, "Publications", "cfg_Publication.xlsx", null, null);
 		} catch (IOException e1) {
 			logger.error("Error generating Excel file for Publications", e1);
 		}
 		
 	}
 	
-	public void writeToExcel (List<String[]> rows, String filename, List<String[]> records) throws IOException {
+	public static void writeToExcel (List<String[]> rows, String sheetName, String filename, List<String[]> records, String sheetName2) throws IOException {
 		FileOutputStream excelWriter = new FileOutputStream(filename);
 		Workbook workbook = new XSSFWorkbook();
 		
@@ -782,7 +846,7 @@ public class CFGCurationService {
         CellStyle boldStyle = workbook.createCellStyle();
         boldStyle.setFont(font);
         
-        Sheet sheet = workbook.createSheet("Mappings");
+        Sheet sheet = workbook.createSheet(sheetName);
         CellStyle wrapTextStyle = workbook.createCellStyle();
         wrapTextStyle.setWrapText(true);
         
@@ -819,7 +883,7 @@ public class CFGCurationService {
         }
         
         if (records != null && !records.isEmpty()) {
-        	Sheet recordsSheet = workbook.createSheet("records");
+        	Sheet recordsSheet = workbook.createSheet(sheetName2);
         	String[] headerRow = records.get(0);
         	Row header = recordsSheet.createRow(0);
         	int i=0;
