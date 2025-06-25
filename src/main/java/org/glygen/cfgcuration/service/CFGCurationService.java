@@ -48,6 +48,7 @@ import org.glygen.cfgcuration.model.mapping.MappingDisease;
 import org.glygen.cfgcuration.model.mapping.MappingOrgan;
 import org.glygen.cfgcuration.model.mapping.MappingScientificName;
 import org.glygen.cfgcuration.model.mapping.MappingTissue;
+import org.glygen.cfgcuration.util.CrossRefAPI;
 import org.glygen.cfgcuration.util.PubmedUtil;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
@@ -558,10 +559,11 @@ public class CFGCurationService {
 	public void addPMIDs () {
 		// add pmids
 		PubmedUtil util = new PubmedUtil(apiKey);
+		CrossRefAPI util2 = new CrossRefAPI();
 		// go through existing ones and assign pmid if not assigned
 		List<Publication> allPublications = publicationRepository.findAll();
 		for (Publication pub: allPublications) {
-			if (pub.getPmid() == null || pub.getPmid().isEmpty()) {
+			if ((pub.getPmid() == null || pub.getPmid().isEmpty())  && (pub.getDoiId() == null || pub.getDoiId().isEmpty())) {
 				// check Pubmed to see if we can get the pmid
 				try {
 					if (pub.getChecked() == null || !pub.getChecked()) {
@@ -569,7 +571,7 @@ public class CFGCurationService {
 						pub.setMatchCount(matches.size()+"");
 						if (!matches.isEmpty()) {
 							for (Publication m: matches) {
-								if (m.equals(pub)) {
+								if (pub.equals(m)) {
 									pub.setPmid(m.getPmid());
 									pub.setDoiId(m.getDoiId());
 									break;
@@ -593,25 +595,17 @@ public class CFGCurationService {
 										} else {
 											pub.setMatchDetails(pub.getMatchDetails() + " Authors did not match: " + m.getAuthor() + ",");
 										}
-										if (m.getJournalName() != null && m.getJournalName().equalsIgnoreCase(pub.getJournalName())) {
+										if (m.journalMatch(pub)) {
 											pub.setMatchDetails(pub.getMatchDetails() + "Journal matched, ");
-											if (m.getYear() != null && m.getYear().equalsIgnoreCase(pub.getYear())) {
-												pub.setMatchDetails(pub.getMatchDetails() + "Year matched, ");
-												if (m.getPageRange() != null && m.getPageRange().equalsIgnoreCase(pub.getPageRange())) {
-													pub.setMatchDetails(pub.getMatchDetails() + "Page range matched, ");
-												} else {
-													pub.setMatchDetails(pub.getMatchDetails() + "Page range did not match: " + m.getPageRange() + " ");
-												}
-											} else {
-												pub.setMatchDetails(pub.getMatchDetails() + "Year did not match: " + m.getYear() + " ");
-											}
-										} else {
-											pub.setMatchDetails(pub.getMatchDetails() + " Journal name did not match: " + m.getJournalName() + ", ");
+										}
+										else {
+											pub.setMatchDetails(pub.getMatchDetails() + " Journal did not match: " + 
+													m.getJournalName() + " (" + m.getYear() + ") " + m.getVolume() + ": " + m.getPageRange() + ", ");
 										}
 										pub.setMatchDetails(pub.getMatchDetails().trim());
 									}
 								} else {
-									pub.setMatchDetails("Multiple matches");
+									pub.setMatchDetails("Multiple results from PubMed. None matched");
 								}
 							} 
 						} else {
@@ -620,6 +614,43 @@ public class CFGCurationService {
 								if (pub.getJournalId() != null) {
 									pub.setPmid(pub.getJournalId());
 									pub.setMatchDetails("Used journalid value as pmid");
+									pub.setChecked(true);
+								}
+							}
+							if (pub.getPmid() == null) {
+								// check crossRef to find matches
+								List<Publication> crossRefMatches = util2.getPublicationByTitle(pub.getTitle());
+								pub.setMatchCount(crossRefMatches.size()+"");
+								if (!crossRefMatches.isEmpty()) {
+									for (Publication m: crossRefMatches) {
+										if (pub.equals(m)) {
+											pub.setPmid(m.getPmid());
+											pub.setDoiId(m.getDoiId());
+											break;
+										}
+									}
+								}
+								if (pub.getDoiId() == null) {
+									if (crossRefMatches.size() == 1) {
+										Publication m = crossRefMatches.get(0);
+										if (m.getTitle() != null && m.getTitle().equalsIgnoreCase(pub.getTitle())) {
+											pub.setMatchDetails("Single CrossRef Match: " + m.getDoiId() + "; Title matched, ");
+											if (m.authorMatch(pub.getAuthor())) {
+												pub.setMatchDetails(pub.getMatchDetails() + "Authors matched, ");
+											} else {
+												pub.setMatchDetails(pub.getMatchDetails() + " Authors did not match: " + m.getAuthor() + ",");
+											}
+											if (m.journalMatch(pub)) {
+												pub.setMatchDetails(pub.getMatchDetails() + "Journal matched, ");
+											} else {
+												pub.setMatchDetails(pub.getMatchDetails() + " Journal did not match: " + 
+														m.getJournalName() + " (" + m.getYear() + ") " + m.getVolume() + ": " + m.getPageRange() + ", ");
+											}
+											pub.setMatchDetails(pub.getMatchDetails().trim());
+										}
+									} else {
+										pub.setMatchDetails("Multiple results from CrossRef. None matched");
+									}
 								}
 							}
 						}
@@ -632,7 +663,7 @@ public class CFGCurationService {
 					        Thread.currentThread().interrupt(); // restore interrupted status
 					    }
 					}
-				} catch (IOException e) {
+				} catch (Exception e) {
 					logger.error("Error getting publication from PubMed", e);
 				}
 			}
@@ -808,22 +839,19 @@ public class CFGCurationService {
 		rows = new ArrayList<>();
 		List<Publication> allPublications = publicationRepository.findAll();
 		//Map<Long, List<String>> recordMap = new HashMap<>();
-		String[] header2 = {"ID", "Carb Key", "Title", "Authors", "Journal Name", "Year", "Page Range", "PMID", "DOI", "Match Details", "Journal Key", "Journal ID", "Journal ID Type"};
+		String[] header2 = {"ID", "Title", "Authors", "Journal", "PMID", "DOI", "Match Details", "Journal Key", "Journal ID", "Journal ID Type"};
 		rows.add(header2);
 		for (Publication m: allPublications) {
-			if (m.getPmid() == null) {
-				String[] row = new String[13];
+			if (m.getPmid() == null && m.getDoiId() == null) {
+				String[] row = new String[10];
 				row[0] = m.getId() +"";
-				row[1] = m.getCarbKey();
-				row[2] = m.getTitle();
-				row[3] = m.getAuthor();
-				row[4] = m.getJournalName();
-				row[5] = m.getYear();
-				row[6] = m.getPageRange();
-				row[9] = m.getMatchDetails();
-				row[10] = m.getJournalKey();
-				row[11] = m.getJournalId();
-				row[12] = m.getJournalIdType();
+				row[1] = m.getTitle();
+				row[2] = m.getAuthor();
+				row[3] = m.getJournalName() + " (" + m.getYear() + ") " + m.getVolume() + ": " + m.getPageRange();
+				row[6] = m.getMatchDetails();
+				row[7] = m.getJournalKey();
+				row[8] = m.getJournalId();
+				row[9] = m.getJournalIdType();
 				rows.add(row);
 			}
 		}
