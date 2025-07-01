@@ -43,9 +43,8 @@ public class PubmedUtil {
 		List<Publication> results = new ArrayList<>();
 		
 		title = title.replaceAll("\n", " ");
-		String encodedTitle = title.replace(" ", "+");
-		
-		encodedTitle = URLEncoder.encode(title, StandardCharsets.UTF_8);
+		title = title.replace(".", "");
+		String encodedTitle = URLEncoder.encode(title, StandardCharsets.UTF_8);
 
 		String apiUrl = url + encodedTitle + "&field=Title";
 		if (apiKey != null) {
@@ -452,8 +451,8 @@ public class PubmedUtil {
 		return results;
 	}
     
-    private static String replaceUmlaut(String input) {
-    	 
+    public static String replaceUmlaut(String input) {
+   	 
         // replace all lower Umlauts
         String output = input.replace("ü", "ue")
                              .replace("ö", "oe")
@@ -469,6 +468,30 @@ public class PubmedUtil {
         output = output.replace("Ü", "UE")
                        .replace("Ö", "OE")
                        .replace("Ä", "AE");
+    
+        return output;
+    }
+    
+    public static String ignoreUmlaut(String input) {
+   	 
+        // replace all lower Umlauts
+        String output = input.replace("ü", "u")
+                             .replace("ö", "o")
+                             .replace("ä", "a")
+                             .replace("ß", "b")
+                             .replace("ó", "o")
+                             .replace("é", "e")
+                             .replace("á", "a");
+    
+        // first replace all capital Umlauts in a non-capitalized context (e.g. Übung)
+        output = output.replaceAll("Ü(?=[a-zäöüß ])", "U")
+                       .replaceAll("Ö(?=[a-zäöüß ])", "O")
+                       .replaceAll("Ä(?=[a-zäöüß ])", "A");
+    
+        // now replace all the other capital Umlauts
+        output = output.replace("Ü", "U")
+                       .replace("Ö", "O")
+                       .replace("Ä", "A");
     
         return output;
     }

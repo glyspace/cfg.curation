@@ -1,6 +1,7 @@
 package org.glygen.cfgcuration.model;
 
 import org.apache.commons.text.similarity.LevenshteinDistance;
+import org.glygen.cfgcuration.util.PubmedUtil;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -279,7 +280,35 @@ public class Publication {
 				lastNames2 += trimmed.trim() + ";";
 			}
 			double score = almostIdentical(lastNames1, lastNames2);
-			return score > 0.9;
+			if (score > 0.9) return true;
+			else {
+				// check other variations
+				authorList = author2.split(";");
+				lastNames2 = "";
+				for (String a: authorList) {
+					String trimmed = a.trim();
+					if (trimmed.indexOf(" ") != -1) {
+						trimmed = trimmed.substring(0, trimmed.lastIndexOf(" "));
+					}
+					lastNames2 += PubmedUtil.replaceUmlaut(trimmed.trim()) + ";";
+				}
+				score = almostIdentical(lastNames1, lastNames2);
+				if (score > 0.9) return true;
+				else {
+					// check other variations
+					authorList = author2.split(";");
+					lastNames2 = "";
+					for (String a: authorList) {
+						String trimmed = a.trim();
+						if (trimmed.indexOf(" ") != -1) {
+							trimmed = trimmed.substring(0, trimmed.lastIndexOf(" "));
+						}
+						lastNames2 += PubmedUtil.ignoreUmlaut(trimmed.trim()) + ";";
+					}
+					score = almostIdentical(lastNames1, lastNames2);
+					return score > 0.9;
+				}
+			}
 		}
 		if (this.author == null && author2 == null) return true;
 		return false;
