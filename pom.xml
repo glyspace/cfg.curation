@@ -34,7 +34,10 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
 		</dependency>
-
+		<dependency>
+	        <groupId>org.springframework</groupId>
+	        <artifactId>spring-web</artifactId>
+	    </dependency>
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
@@ -90,8 +93,20 @@
 		    <artifactId>commons-text</artifactId>
 		    <version>1.11.0</version> 
 		</dependency>
+		<dependency>
+		  <groupId>grits</groupId>
+		  <artifactId>glycanarray</artifactId>
+		  <version>1.52</version>
+		</dependency>
 
 	</dependencies>
+	
+	<repositories>
+		<repository>
+			<id>nexus</id>
+			<url>https://glygen.ccrc.uga.edu/repository/content/repositories/thirdparty/</url>
+		</repository>
+	</repositories>
 
 	<build>
 		<plugins>

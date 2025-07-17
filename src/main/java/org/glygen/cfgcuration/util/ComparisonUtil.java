@@ -60,7 +60,11 @@ public class ComparisonUtil {
 	            	dis.id = id;
 	            	String namespaceName = row.getCell(3).getStringCellValue();
 	            	String name = row.getCell(2).getStringCellValue();
-	            	String mappingName = row.getCell(5).getStringCellValue();
+	            	Cell mappingCell = row.getCell(5);
+	            	String mappingName = null;
+	            	if (mappingCell != null) {
+	            		mappingName = mappingCell.getStringCellValue();
+	            	}
 	            	String rank = null;
     				if (row.getCell(6) != null && row.getCell(6).getCellType() != CellType.NUMERIC) {
     					rank = row.getCell(6).getStringCellValue();
@@ -258,7 +262,11 @@ public class ComparisonUtil {
 	            	} else {
 	            		namespaceIdInFile = namespaceIdCell.getStringCellValue();
 	            	}
-	            	String mappingName = row.getCell(5).getStringCellValue();
+	            	Cell mappingCell = row.getCell(5);
+	            	String mappingName = null;
+	            	if (mappingCell != null) {
+	            		mappingName = mappingCell.getStringCellValue();
+	            	}
 	            	String rank = null;
     				if (row.getCell(6) != null && row.getCell(6).getCellType() != CellType.NUMERIC) {
     					rank = row.getCell(6).getStringCellValue();
