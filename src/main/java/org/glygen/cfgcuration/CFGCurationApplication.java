@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.glygen.cfgcuration.model.mapping.Mapping;
 import org.glygen.cfgcuration.service.CFGCurationService;
+import org.glygen.cfgcuration.service.CFGToTablemakerService;
 import org.glygen.cfgcuration.util.ComparisonUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
@@ -20,6 +21,9 @@ public class CFGCurationApplication {
 	
 	@Autowired
 	CFGCurationService service;
+	
+	@Autowired
+	CFGToTablemakerService tablemaker;
 	
 	@Autowired
 	ComparisonUtil comparisonService;
@@ -41,6 +45,8 @@ public class CFGCurationApplication {
 			List<String> filenames = args.getOptionValues("file");
 			List<Mapping> mappings = new ComparisonUtil().compareFiles(filenames, tablenames.get(0));
 			//service.updateMappings(mappings, tablenames.get(0));
+		} else if (args.containsOption("tablemaker")) {
+			tablemaker.createGlycans();
 		} else {
 			//service.assignCarbKeys();
 			//service.findRecordsWithMultiples();

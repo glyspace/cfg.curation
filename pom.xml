@@ -48,6 +48,11 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+		    <groupId>com.fasterxml.jackson.core</groupId>
+		    <artifactId>jackson-databind</artifactId>
+		</dependency>
+
 		
 		<!-- https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-annotations -->
 		<dependency>
@@ -93,20 +98,7 @@
 		    <artifactId>commons-text</artifactId>
 		    <version>1.11.0</version> 
 		</dependency>
-		<dependency>
-		  <groupId>grits</groupId>
-		  <artifactId>glycanarray</artifactId>
-		  <version>1.52</version>
-		</dependency>
-
 	</dependencies>
-	
-	<repositories>
-		<repository>
-			<id>nexus</id>
-			<url>https://glygen.ccrc.uga.edu/repository/content/repositories/thirdparty/</url>
-		</repository>
-	</repositories>
 
 	<build>
 		<plugins>

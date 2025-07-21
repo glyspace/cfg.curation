@@ -9,3 +9,8 @@ spring:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
 ncbi:
   api-key: ENC(/IuwNTHNR7ZDXFolnV/bnTfhj9l0Awr2UN1wBeWdKPzaARshqNOUTA3F7giwo6tq)
+  
+tablemaker:
+  api-url: http://localhost:8080/
+  user-id: cfgdata
+  password: ENC(K7VPLELDFUvhkAWh1QjpKxy4JJHduoIm)

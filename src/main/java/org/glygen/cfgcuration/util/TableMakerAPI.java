@@ -3,7 +3,9 @@ package org.glygen.cfgcuration.util;
 import java.util.Arrays;
 
 import org.glygen.cfgcuration.model.tablemaker.GlycanView;
+import org.glygen.cfgcuration.model.tablemaker.LoginRequest;
 import org.glygen.cfgcuration.model.tablemaker.SequenceFormat;
+import org.json.JSONObject;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -21,7 +23,7 @@ public class TableMakerAPI {
 	
 	static TableMakerAPI instance;
 	
-	private RestTemplate restTemplate;
+	private RestTemplate restTemplate = new RestTemplate();
 	
 	private TableMakerAPI() {
 	}
@@ -35,27 +37,34 @@ public class TableMakerAPI {
 	public void login() {
 		String url = apiURL + "api/account/authenticate";	
 		
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+
+		
 		LoginRequest loginRequest = new LoginRequest();
 		loginRequest.setUsername(userName);
 		loginRequest.setPassword(password);
-		HttpEntity<LoginRequest> requestEntity = new HttpEntity<LoginRequest>(loginRequest);
-		HttpEntity<Void> response = this.restTemplate.exchange(url, HttpMethod.POST, requestEntity, Void.class);
-		HttpHeaders header = response.getHeaders();
-		this.token = header.getFirst("Authorization");
+		HttpEntity<LoginRequest> requestEntity = new HttpEntity<LoginRequest>(loginRequest, headers);
+		HttpEntity<String> response = this.restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+		String resp = response.getBody();
+		JSONObject obj = new JSONObject(resp);
+		JSONObject data = obj.getJSONObject("data");
+		this.token = data.getString("token");
 	}
 	
-	public void addGlycan(String glycoCT) {
+	public void addGlycan(String sequence) {
 		if (this.token == null) login();
 		
-		String url = apiURL + "api/glycan/addglycan";
+		String url = apiURL + "api/data/addglycan";
 		GlycanView glycan = new GlycanView();
-		glycan.setFormat(SequenceFormat.GLYCOCT);
-		glycan.setSequence(glycoCT);
+		glycan.setFormat(SequenceFormat.LINEARCODE);
+		glycan.setSequence(sequence);
 		
 		//set the header with token
 		HttpHeaders headers = new HttpHeaders();
 	    headers.setAccept(Arrays.asList(MediaType.APPLICATION_JSON));
-	    headers.add("Authorization", token);
+	    headers.add("Authorization", "Bearer " + token);
 		
 		HttpEntity<GlycanView> requestEntity = new HttpEntity<GlycanView>(glycan, headers);
 		ResponseEntity<String> response = this.restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
@@ -84,25 +93,4 @@ public class TableMakerAPI {
 	public void setPassword(String password) {
 		this.password = password;
 	}	
-	
-	class LoginRequest {
-		public String username;
-	    public String password;
-		
-	    public String getUsername() {
-			return username;
-		}
-	    
-	    public String getPassword() {
-			return password;
-		}
-	    
-	    public void setUsername(String username) {
-			this.username = username;
-		}
-	    
-	    public void setPassword(String password) {
-			this.password = password;
-		}
-	}
 }
