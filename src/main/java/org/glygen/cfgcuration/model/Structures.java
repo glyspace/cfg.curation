@@ -6,7 +6,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name="structures")
+@Table(name="structures", schema="raw_cfg")
 public class Structures {
 	@Id
 	String id;

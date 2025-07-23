@@ -1,10 +1,17 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5436/postgres
-    username: glygen
-    password: ENC(9GDuOYrvoTbqTITr5cGwuVyUYCYFx/aZgPZy/i21PRw=)
-    driver-class-name: org.postgresql.Driver
-    separator: ^^^ END OF SCRIPT ^^^
+    primary:
+      url: jdbc:postgresql://localhost:5436/postgres
+      username: glygen
+      password: ENC(9GDuOYrvoTbqTITr5cGwuVyUYCYFx/aZgPZy/i21PRw=)
+      driver-class-name: org.postgresql.Driver
+      separator: ^^^ END OF SCRIPT ^^^
+    secondary:
+      url: jdbc:postgresql://localhost:5436/glycomedb
+      username: glygen
+      password: ENC(9GDuOYrvoTbqTITr5cGwuVyUYCYFx/aZgPZy/i21PRw=)
+      driver-class-name: org.postgresql.Driver
+      separator: ^^^ END OF SCRIPT ^^^
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
 ncbi:

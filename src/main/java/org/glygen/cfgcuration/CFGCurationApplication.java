@@ -9,6 +9,7 @@ import org.glygen.cfgcuration.service.CFGToTablemakerService;
 import org.glygen.cfgcuration.util.ComparisonUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -17,6 +18,7 @@ import org.springframework.context.event.EventListener;
 import com.ulisesbocchio.jasyptspringboot.environment.StandardEncryptableEnvironment;
 
 @SpringBootApplication
+@EnableAutoConfiguration
 public class CFGCurationApplication {
 	
 	@Autowired

@@ -11,6 +11,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 public class TableMakerAPI {
@@ -53,7 +54,7 @@ public class TableMakerAPI {
 		this.token = data.getString("token");
 	}
 	
-	public void addGlycan(String sequence) {
+	public String addGlycan(String sequence) {
 		if (this.token == null) login();
 		
 		String url = apiURL + "api/data/addglycan";
@@ -68,6 +69,10 @@ public class TableMakerAPI {
 		
 		HttpEntity<GlycanView> requestEntity = new HttpEntity<GlycanView>(glycan, headers);
 		ResponseEntity<String> response = this.restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+		JSONObject obj = new JSONObject(response.getBody());
+		JSONObject data = obj.getJSONObject("data");
+		
+		return data.getString("glytoucanID");
 	}
 
 	public String getApiURL() {
@@ -92,5 +97,67 @@ public class TableMakerAPI {
 
 	public void setPassword(String password) {
 		this.password = password;
+	}
+
+	public String addGlycanGlycoCT(String glycoCT) {
+		if (this.token == null) login();
+		
+		String url = apiURL + "api/data/addglycan";
+		GlycanView glycan = new GlycanView();
+		glycan.setFormat(SequenceFormat.GLYCOCT);
+		glycan.setSequence(glycoCT);
+		
+		//set the header with token
+		HttpHeaders headers = new HttpHeaders();
+	    headers.setAccept(Arrays.asList(MediaType.APPLICATION_JSON));
+	    headers.add("Authorization", "Bearer " + token);
+		
+		HttpEntity<GlycanView> requestEntity = new HttpEntity<GlycanView>(glycan, headers);
+		try {
+			ResponseEntity<String> response = this.restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+			JSONObject obj = new JSONObject(response.getBody());
+			JSONObject data = obj.getJSONObject("data");
+			
+			return data.getString("glytoucanID");
+		} catch (HttpClientErrorException e) {
+			String errorMessage = e.getResponseBodyAsString();
+			JSONObject obj = new JSONObject(errorMessage);
+			if (obj.has("message")) {
+				String message = obj.getString("message");
+				if (message != null) {
+					if (message.contains("already")) {
+						// duplicate
+						// find the existing glycan
+						return getGlycan (glycoCT);
+					}
+				}
+			}
+			return null;
+		}
+	}
+
+	private String getGlycan(String glycoCT) {
+		if (this.token == null) login();
+		
+		String url = apiURL + "api/data/getglycan";
+		GlycanView glycan = new GlycanView();
+		glycan.setFormat(SequenceFormat.GLYCOCT);
+		glycan.setSequence(glycoCT);
+		
+		//set the header with token
+		HttpHeaders headers = new HttpHeaders();
+	    headers.setAccept(Arrays.asList(MediaType.APPLICATION_JSON));
+	    headers.add("Authorization", "Bearer " + token);
+		
+		HttpEntity<GlycanView> requestEntity = new HttpEntity<GlycanView>(glycan, headers);
+		try {
+			ResponseEntity<String> response = this.restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+			JSONObject obj = new JSONObject(response.getBody());
+			JSONObject data = obj.getJSONObject("data");
+			
+			return data.getString("glytoucanID");
+		} catch (HttpClientErrorException e) {
+			return null;
+		}
 	}	
 }
