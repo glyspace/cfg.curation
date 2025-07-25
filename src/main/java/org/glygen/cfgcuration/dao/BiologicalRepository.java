@@ -1,6 +1,7 @@
 package org.glygen.cfgcuration.dao;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.glygen.cfgcuration.model.Biological;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -26,5 +27,7 @@ public interface BiologicalRepository extends JpaRepository<Biological, String> 
 	List<Biological> findByTissueIgnoreCase (String name);
 	List<Biological> findByOrganIgnoreCase (String name);
 	List<Biological> findByDiseaseIgnoreCase (String name);
+	
+	List<Biological> findByCarbId (String carbId);
 
 }

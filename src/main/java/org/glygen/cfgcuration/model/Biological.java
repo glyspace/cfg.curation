@@ -11,8 +11,8 @@ public class Biological {
 	
 	@Id
 	String id;
-	@Column
-	String carb_id;
+	@Column (name="carb_id")
+	String carbId;
 	@Column
 	String commonname;
 	@Column
@@ -30,11 +30,11 @@ public class Biological {
 	public void setId(String id) {
 		this.id = id;
 	}
-	public String getCarb_id() {
-		return carb_id;
+	public String getCarbId() {
+		return carbId;
 	}
-	public void setCarb_id(String carb_id) {
-		this.carb_id = carb_id;
+	public void setCarbId(String carb_id) {
+		this.carbId = carb_id;
 	}
 	public String getCommonname() {
 		return commonname;

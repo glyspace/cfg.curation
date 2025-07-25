@@ -1,22 +1,38 @@
 package org.glygen.cfgcuration.service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import org.glygen.cfgcuration.dao.BiologicalRepository;
+import org.glygen.cfgcuration.dao.MappingDiseaseRepository;
+import org.glygen.cfgcuration.dao.MappingOrganRepository;
+import org.glygen.cfgcuration.dao.MappingSpeciesRepository;
+import org.glygen.cfgcuration.dao.MappingTissueRepository;
 import org.glygen.cfgcuration.dao.PublicationRepository;
 import org.glygen.cfgcuration.dao.StructureRepository;
 import org.glygen.cfgcuration.dao2.RemoteStructureRepository;
 import org.glygen.cfgcuration.glycomedb.GlycoCTStructure;
 import org.glygen.cfgcuration.glycomedb.RemoteStructure;
+import org.glygen.cfgcuration.model.Biological;
 import org.glygen.cfgcuration.model.Publication;
 import org.glygen.cfgcuration.model.Structures;
+import org.glygen.cfgcuration.model.mapping.Mapping;
+import org.glygen.cfgcuration.model.mapping.MappingDisease;
+import org.glygen.cfgcuration.model.mapping.MappingScientificName;
+import org.glygen.cfgcuration.model.mapping.MappingTissue;
+import org.glygen.cfgcuration.model.tablemaker.CollectionView;
+import org.glygen.cfgcuration.model.tablemaker.Datatype;
+import org.glygen.cfgcuration.model.tablemaker.Glycan;
+import org.glygen.cfgcuration.model.tablemaker.Metadata;
 import org.glygen.cfgcuration.util.TableMakerAPI;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import jakarta.transaction.Transactional;
 
 @Service
 public class CFGToTablemakerService {
@@ -40,12 +56,20 @@ public class CFGToTablemakerService {
 	final BiologicalRepository biologicalRepository;
 	final PublicationRepository publicationRepository;
 	final RemoteStructureRepository remoteRepository;
+	final MappingDiseaseRepository mappingDiseaseRepository;
+	private final MappingTissueRepository mappingTissueRepository;
+	private final MappingSpeciesRepository mappingSpeciesRepository;
+	private final MappingOrganRepository mappingOrganRepository;
 	
-	public CFGToTablemakerService(StructureRepository structureRepository, PublicationRepository publicationRepository, BiologicalRepository biologicalRepository, RemoteStructureRepository remoteRepository) {
+	public CFGToTablemakerService(StructureRepository structureRepository, PublicationRepository publicationRepository, BiologicalRepository biologicalRepository, RemoteStructureRepository remoteRepository, MappingTissueRepository mappingTissueRepository, MappingSpeciesRepository mappingSpeciesRepository, MappingOrganRepository mappingOrganRepository, MappingDiseaseRepository mappingDiseaseRepository) {
 		this.structureRepository = structureRepository;
 		this.biologicalRepository = biologicalRepository;
 		this.publicationRepository = publicationRepository;
 		this.remoteRepository = remoteRepository;
+		this.mappingDiseaseRepository = mappingDiseaseRepository;
+		this.mappingTissueRepository = mappingTissueRepository;
+		this.mappingSpeciesRepository = mappingSpeciesRepository;
+		this.mappingOrganRepository = mappingOrganRepository;
 	}
 	
 	public void createGlycans () {
@@ -66,8 +90,6 @@ public class CFGToTablemakerService {
 						glycanGlytoucanMap.put(str.getCarb_id(), glytoucanId);
 					}
 				} catch (Exception e) {
-					// catch DuplicateException
-					
 					logger.error("could not add glycan with glycoCT: " + structure.getGlycoCT(), e);
 				}
 			} else {
@@ -94,7 +116,6 @@ public class CFGToTablemakerService {
 				}
 			}
 		}
-		
 	}
 	
 	public void createCollections () {
@@ -103,6 +124,8 @@ public class CFGToTablemakerService {
 		this.tablemaker.setUserName(userId);
 		this.tablemaker.setPassword(password);
 		List<Structures> structures = structureRepository.findAll();
+		List<CollectionView> addedCollections = new ArrayList<CollectionView>();
+		StringBuffer notes = new StringBuffer();
 		for (Structures str: structures) {
 			try {
 				String glytoucanId = glycanGlytoucanMap.get(str.getCarb_id());
@@ -113,14 +136,109 @@ public class CFGToTablemakerService {
 				if (str.getCarb_key() != null) {
 					List<Publication> pubs = publicationRepository.findByCarbKey(str.getCarb_key());
 					for (Publication pub: pubs) {
+						if (pub.getPmid() == null && pub.getDoiId() == null) {
+							logger.info("There is no pmid for this publication " + pub.getId());
+							notes.append("Not including " + pub.getCarbKey() + " since there is no pmid or doi\n");
+							continue;
+						}
 						// create a collection for each glycan-paper pair
+						CollectionView collection = new CollectionView();
+						collection.setGlycans(new ArrayList<>());
+						Glycan glycan = new Glycan();
+						glycan.setGlytoucanID(glytoucanId);
+						collection.getGlycans().add(glycan);
+						Metadata metadata = new Metadata();
+						if (pub.getPmid() != null) metadata.setValue(pub.getPmid());
+						else metadata.setValue(pub.getDoiId());
+						Datatype datatype = new Datatype();
+						datatype.setDatatypeId(2L);
+						metadata.setType(datatype);
+						collection.setMetadata(new ArrayList<Metadata>());
+						collection.getMetadata().add(metadata);
 						
+						String id = this.tablemaker.addCollection (collection);
+						collection.setCollectionId(Long.parseLong(id));
+						addedCollections.add(collection);
+					}
+					
+					// add a collection for each biological entry
+					List<Biological> bList = biologicalRepository.findByCarbId(str.getCarb_id());
+					for (Biological bio: bList) {
+						CollectionView collection = new CollectionView();
+						collection.setGlycans(new ArrayList<>());
+						Glycan glycan = new Glycan();
+						glycan.setGlytoucanID(glytoucanId);
+						collection.getGlycans().add(glycan);
+						collection.setMetadata(new ArrayList<Metadata>());
+						if (bio.getScientificname() != null) {
+							// find the mapping
+							Optional<MappingScientificName> mapping = mappingSpeciesRepository.findByNameIgnoreCase(bio.getScientificname());
+							if (mapping.isPresent()) {
+								String namespaceId = mapping.get().getNamespaceId();
+								if (namespaceId != null) {
+									Metadata metadata = new Metadata();
+									Datatype datatype = new Datatype();
+									datatype.setDatatypeId(3L);
+									metadata.setType(datatype);
+									metadata.setValueId(namespaceId);
+									metadata.setValue(mapping.get().getNamespaceName());
+									collection.getMetadata().add(metadata);
+								}
+							}
+						}
+						if (bio.getDisease() != null) {
+							// find the mapping
+							Optional<MappingDisease> mapping = mappingDiseaseRepository.findByNameIgnoreCase(bio.getDisease());
+							if (mapping.isPresent()) {
+								String namespaceId = mapping.get().getNamespaceId();
+								if (namespaceId != null) {
+									Metadata metadata = new Metadata();
+									Datatype datatype = new Datatype();
+									datatype.setDatatypeId(7L);
+									metadata.setType(datatype);
+									metadata.setValueId(namespaceId);
+									metadata.setValue(mapping.get().getNamespaceName());
+									collection.getMetadata().add(metadata);
+								}
+							}
+						}
+						if (bio.getTissue() != null) {
+							// find the mapping
+							Optional<MappingTissue> mapping = mappingTissueRepository.findByNameIgnoreCase(bio.getTissue());
+							if (mapping.isPresent()) {
+								String namespaceId = mapping.get().getNamespaceId();
+								if (namespaceId != null) {
+									Metadata metadata = new Metadata();
+									Datatype datatype = new Datatype();
+									datatype.setDatatypeId(5L);
+									metadata.setType(datatype);
+									metadata.setValueId(namespaceId);
+									metadata.setValue(mapping.get().getNamespaceName());
+									collection.getMetadata().add(metadata);
+								}
+							}
+						}
+						//TODO handle organs
+						if (collection.getMetadata().isEmpty()) {
+							logger.info ("No metadata for " + str.getCarb_id());
+							notes.append("Not including " +  str.getCarb_key() + " since there is no metadata");
+						} else {
+							//TODO add contributor information
+							String id = this.tablemaker.addCollection (collection);
+							collection.setCollectionId(Long.parseLong(id));
+							addedCollections.add(collection);
+						}
+
 					}
 				}
 				
 			} catch (Exception e) {
 				logger.error("could not convert sequence to GlycoCT: " + str.getLinearcode(), e);
 			}
+		}
+		
+		if (!addedCollections.isEmpty()) {
+			
 		}
 		
 	}

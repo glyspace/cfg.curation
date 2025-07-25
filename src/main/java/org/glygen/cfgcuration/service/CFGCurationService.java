@@ -549,7 +549,7 @@ public class CFGCurationService {
 			if ((multipleDisease && multipleTissue) || 
 					(multipleTissue && multipleOrgan) ||
 					(multipleDisease && multipleOrgan)) {
-				multi.add(rec.getCarb_id());
+				multi.add(rec.getCarbId());
 			}
 		}
 		
@@ -689,7 +689,7 @@ public class CFGCurationService {
 				List<Biological> bsList = bioRepository.findByTissueIgnoreCase(m.getName());
 				Set<String> recordList = new HashSet<>();
 				for (Biological bs: bsList) {
-					String cc = bs.getCarb_id();
+					String cc = bs.getCarbId();
 					recordList.add(cc);
 				}
 				recordMap.put(m.getId(), new ArrayList<>(recordList));
@@ -730,7 +730,7 @@ public class CFGCurationService {
 				List<Biological> bsList = bioRepository.findByScientificnameIgnoreCase(m.getName());
 				Set<String> recordList = new HashSet<>();
 				for (Biological bs: bsList) {
-					String cc = bs.getCarb_id();
+					String cc = bs.getCarbId();
 					recordList.add(cc);
 				}
 				recordMap.put(m.getId(), new ArrayList<>(recordList));
@@ -770,7 +770,7 @@ public class CFGCurationService {
 				List<Biological> bsList = bioRepository.findByDiseaseIgnoreCase(m.getName());
 				Set<String> recordList = new HashSet<>();
 				for (Biological bs: bsList) {
-					String cc = bs.getCarb_id();
+					String cc = bs.getCarbId();
 					recordList.add(cc);
 				}
 				recordMap.put(m.getId(), new ArrayList<>(recordList));
@@ -811,7 +811,7 @@ public class CFGCurationService {
 				List<Biological> bsList = bioRepository.findByOrganIgnoreCase(m.getName());
 				Set<String> recordList = new HashSet<>();
 				for (Biological bs: bsList) {
-					String cc = bs.getCarb_id();
+					String cc = bs.getCarbId();
 					recordList.add(cc);
 				}
 				recordMap.put(m.getId(), new ArrayList<>(recordList));

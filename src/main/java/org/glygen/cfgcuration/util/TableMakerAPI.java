@@ -2,6 +2,7 @@ package org.glygen.cfgcuration.util;
 
 import java.util.Arrays;
 
+import org.glygen.cfgcuration.model.tablemaker.CollectionView;
 import org.glygen.cfgcuration.model.tablemaker.GlycanView;
 import org.glygen.cfgcuration.model.tablemaker.LoginRequest;
 import org.glygen.cfgcuration.model.tablemaker.SequenceFormat;
@@ -73,6 +74,24 @@ public class TableMakerAPI {
 		JSONObject data = obj.getJSONObject("data");
 		
 		return data.getString("glytoucanID");
+	}
+	
+	public String addCollection (CollectionView collection) {
+		if (this.token == null) login();
+		
+		String url = apiURL + "api/data/addcollection";
+		
+		//set the header with token
+		HttpHeaders headers = new HttpHeaders();
+	    headers.setAccept(Arrays.asList(MediaType.APPLICATION_JSON));
+	    headers.add("Authorization", "Bearer " + token);
+		
+		HttpEntity<CollectionView> requestEntity = new HttpEntity<>(collection, headers);
+		ResponseEntity<String> response = this.restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+		JSONObject obj = new JSONObject(response.getBody());
+		JSONObject data = obj.getJSONObject("data");
+		
+		return data.getString("collectionId");
 	}
 
 	public String getApiURL() {
