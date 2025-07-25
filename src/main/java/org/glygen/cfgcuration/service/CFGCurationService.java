@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -18,9 +19,16 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.apache.commons.collections4.trie.PatriciaTrie;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
+import org.apache.poi.EncryptedDocumentException;
 import org.apache.poi.common.usermodel.HyperlinkType;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.CreationHelper;
 import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.Hyperlink;
@@ -28,6 +36,7 @@ import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.glygen.cfgcuration.NamespaceHandler;
@@ -387,6 +396,111 @@ public class CFGCurationService {
 			}
 			
 		}
+	}
+	
+	@Transactional
+	public void addPublicationsFromFile (String filename) {
+		File file1 = new File (filename);
+		try {
+			Workbook workbook = WorkbookFactory.create(file1);
+			Sheet mappings = workbook.getSheetAt(0);
+			Iterator<Row> rowIterator = mappings.iterator();
+			int count = 0;
+			while (rowIterator.hasNext()) {
+	            Row row = rowIterator.next();
+	            if (count == 0) {
+	            	count = 1;
+	            	continue;
+	            } else {
+	            	String id = null;
+	            	Cell idCell = row.getCell(0);
+	            	if (idCell == null) {
+	            		logger.warn("ID is empty for row " + row.getRowNum() + " exiting!");
+	            		break;
+	            	}
+	            	if (idCell.getCellType() == CellType.NUMERIC) {
+	            		id = (int)idCell.getNumericCellValue() + "";
+	            	} else {
+	            		id = idCell.getStringCellValue();
+	            	}
+	            	String pmid = null;
+	            	Cell pmidCell = row.getCell(4);
+	            	if (pmidCell != null) {
+	            		if (pmidCell.getCellType() == CellType.NUMERIC) {
+		            		pmid = (int)pmidCell.getNumericCellValue() + "";
+		            	} else {
+		            		pmid = pmidCell.getStringCellValue();
+		            	}
+	            		pmid = pmid.trim();
+	            	}
+	            	String doi = row.getCell(5).getStringCellValue();
+	            	if (doi != null && !doi.isEmpty()) {
+	            		doi = doi.trim();
+	            		// check if it is valid
+	            		if (doi.startsWith("doi.org/")) {
+	            			doi = doi.substring(8, doi.length());
+	            		} else if (doi.startsWith("https://doi.org/")) {
+	            			doi = doi.substring(16, doi.length());
+	            		}
+	            		try {
+	            			boolean valid = checkDOI(doi);
+	            			if (!valid) {
+	            				logger.error("DOI " + doi + " is not valid for publication " + id);
+	            				continue;
+	            			}
+	            		} catch (Exception e) {
+	            			logger.error(e.getMessage());
+	            			logger.error("DOI " + doi + " is not valid for publication " + id);
+	            			continue;
+	            		}
+	            	}
+	            	if ((pmid != null && !pmid.isEmpty()) || (doi != null && !doi.isEmpty())) {
+		            	try {
+		            		Optional<Publication> pubHandle = publicationRepository.findById(Long.parseLong(id));
+		            		if (pubHandle.isPresent()) {
+		            			Publication pub = pubHandle.get();
+		            			if (pub.getPmid() == null && pmid != null && !pmid.isEmpty()) {
+		            				pub.setPmid(pmid);
+		            			} else if (pub.getPmid()!= null && pmid != null && !pmid.isEmpty() && !pub.getPmid().equals(pmid)) {
+		            				logger.error("There is a mismatch for pmid for publication " + id);
+		            			}
+		            			if (pub.getDoiId() == null && doi != null && !doi.isEmpty()) {
+		            				pub.setDoiId(doi);
+		            			} else if (pub.getDoiId()!= null && doi != null && !doi.isEmpty() && !pub.getDoiId().equals(doi)) {
+		            				logger.error("There is a mismatch for DOI for publication " + id);
+		            			}
+		            			publicationRepository.save(pub);
+		            			count++;
+		            		} else {
+		            			logger.error("could not locate publication with id " + id);
+		            		}
+		            	} catch (Exception e1) {
+		            		logger.error("could not locate publication with id " + id, e1);
+		            	}
+	            	}
+	            }
+			}
+			logger.info(count + " publications are updated");
+		} catch (EncryptedDocumentException | IOException e) {
+			logger.error("Error getting pmids from excel file " + filename, e);
+		} 
+	}
+	
+	public boolean checkDOI (String doi) throws IOException {
+		String pubUrl = "https://doi.org/" + doi;
+		try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+	        HttpGet request = new HttpGet(pubUrl);
+	        request.setHeader("Accept", "application/vnd.citationstyles.csl+json");
+	        HttpResponse response = httpClient.execute(request);
+	        if (response.getStatusLine().getStatusCode() > 300) {
+	        	throw new IOException ("Error getting the search results from PubMed: " + response.getStatusLine().getReasonPhrase());
+	        }
+	        String json = EntityUtils.toString(response.getEntity());
+	        if (json.contains("errmsg")) {
+	        	return false;
+	        }
+	        return true;
+        } 
 	}
 	
 	public void addInformationToMappingTables () {

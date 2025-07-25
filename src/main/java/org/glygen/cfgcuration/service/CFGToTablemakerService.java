@@ -19,20 +19,19 @@ import org.glygen.cfgcuration.glycomedb.RemoteStructure;
 import org.glygen.cfgcuration.model.Biological;
 import org.glygen.cfgcuration.model.Publication;
 import org.glygen.cfgcuration.model.Structures;
-import org.glygen.cfgcuration.model.mapping.Mapping;
 import org.glygen.cfgcuration.model.mapping.MappingDisease;
 import org.glygen.cfgcuration.model.mapping.MappingScientificName;
 import org.glygen.cfgcuration.model.mapping.MappingTissue;
 import org.glygen.cfgcuration.model.tablemaker.CollectionView;
+import org.glygen.cfgcuration.model.tablemaker.DatasetInputView;
 import org.glygen.cfgcuration.model.tablemaker.Datatype;
 import org.glygen.cfgcuration.model.tablemaker.Glycan;
+import org.glygen.cfgcuration.model.tablemaker.License;
 import org.glygen.cfgcuration.model.tablemaker.Metadata;
 import org.glygen.cfgcuration.util.TableMakerAPI;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-
-import jakarta.transaction.Transactional;
 
 @Service
 public class CFGToTablemakerService {
@@ -118,7 +117,7 @@ public class CFGToTablemakerService {
 		}
 	}
 	
-	public void createCollections () {
+	public void createCollectionsAndPublishDataset () {
 		this.tablemaker = TableMakerAPI.getInstance();
 		this.tablemaker.setApiURL(apiUrl);
 		this.tablemaker.setUserName(userId);
@@ -223,7 +222,13 @@ public class CFGToTablemakerService {
 							logger.info ("No metadata for " + str.getCarb_id());
 							notes.append("Not including " +  str.getCarb_key() + " since there is no metadata");
 						} else {
-							//TODO add contributor information
+							//TODO fix contributor information
+							Metadata metadata = new Metadata();
+							Datatype datatype = new Datatype();
+							datatype.setDatatypeId(30L);
+							metadata.setType(datatype);
+							metadata.setValue("curatedBy:Sena Arpinar (sena@uga.edu, University of Georgia)|createdWith:GlyTableMaker (https://glygen.ccrc.uga.edu/tablemaker)");
+							collection.getMetadata().add(metadata);
 							String id = this.tablemaker.addCollection (collection);
 							collection.setCollectionId(Long.parseLong(id));
 							addedCollections.add(collection);
@@ -238,7 +243,19 @@ public class CFGToTablemakerService {
 		}
 		
 		if (!addedCollections.isEmpty()) {
+			DatasetInputView dataset = new DatasetInputView();
+			dataset.setName("Consortium for Functional Glycomics (CFG) Database");
+			dataset.setLicense(new License());
+			dataset.getLicense().setId(2L);
+			dataset.getLicense().setName("CC BY 4.0");
+			dataset.getLicense().setUrl("https://creativecommons.org/licenses/by/4.0/");
+			dataset.getLicense().setCommercialUse(true);
+			dataset.getLicense().setAttribution("You must give appropriate credit , provide a link to the license, and indicate if changes were made . You may do so in any reasonable manner, but not in any way that suggests the licensor endorses you or your use.");
+			dataset.getLicense().setDistribution("No additional restrictions — You may not apply legal terms or technological measures that legally restrict others from doing anything the license permits.");
+			dataset.setNotes(notes.toString());
+			dataset.setCollections(addedCollections);
 			
+			this.tablemaker.publishDataset(dataset);
 		}
 		
 	}
