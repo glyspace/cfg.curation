@@ -39,6 +39,8 @@ public class PubmedUtil {
 	static String ncbiTaxUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=taxonomy&retmode=json&term=";
 	static String ncbiFetchUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=taxonomy&retmode=xml&id=";
 	
+	String doiUrl = "https://doi.org/";
+	
 	public List<Publication> getPublicationByTitle (String title) throws IOException {
 		List<Publication> results = new ArrayList<>();
 		
@@ -375,6 +377,58 @@ public class PubmedUtil {
         }
     	
     }
+    
+    public Publication getPublicationByDOI (String doi) throws IOException, Exception {
+		String pubUrl = doiUrl + doi;
+
+		try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+	        HttpGet request = new HttpGet(pubUrl);
+	        HttpResponse response = httpClient.execute(request);
+	        if (response.getStatusLine().getStatusCode() > 300) {
+	        	throw new IOException ("Error getting the publication with DOI: " + response.getStatusLine().getReasonPhrase());
+	        }
+	        String json = EntityUtils.toString(response.getEntity());
+	        return createFromJson (json);
+        }
+	}
+	
+	private Publication createFromJson(String json) {
+		Publication pub = new Publication();
+		final JSONObject obj = new JSONObject(json);
+		if (obj.has("page")) {
+			String pageRange = obj.getString("page");
+			if (pageRange != null) {
+				pub.setPageRange(pageRange);
+			}
+		}
+		if (obj.has("DOI")) pub.setDoiId(obj.getString("DOI"));
+		if (obj.has("title")) pub.setTitle(obj.getString("title"));
+		if (obj.has("volume")) pub.setVolume(obj.getString("volume"));
+		if (obj.has("container-title")) pub.setJournalName(obj.getString("container-title"));
+		if (obj.has("created")) {
+			JSONObject dateObject = obj.getJSONObject("created");
+			if (dateObject != null) {
+				String dateTime = dateObject.getString("date-time");
+				if (dateTime != null && dateTime.length() > 4) {
+					try {
+						pub.setYear(dateTime.substring(0, 4));
+					} catch (NumberFormatException e) {
+						//ignore
+					}
+				}
+			}
+		}
+		if (obj.has("author")) {
+			JSONArray authors = obj.getJSONArray("author");
+			String authorsString = "";
+			for (int i=0; i < authors.length(); i++) {
+				JSONObject author = authors.getJSONObject(i);
+				authorsString += author.getString("family") + author.getString("given").charAt(0) + ", ";
+			}
+			pub.setAuthor(authorsString.substring(0, authorsString.lastIndexOf(",")));
+		}
+		return pub;
+	}
     
     public Species getSpeciesByID (String id) throws IOException {
 		String apiUrl = ncbiFetchUrl + id;

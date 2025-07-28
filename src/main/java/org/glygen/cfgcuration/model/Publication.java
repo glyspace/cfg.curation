@@ -56,6 +56,13 @@ public class Publication {
 	@Column(length=4000)
 	String matchDetails;
 	
+	@Column
+	Double journalMatchScore = 1.0;
+	@Column
+	Double titleMatchScore = 1.0;
+	@Column
+	Double authorMatchScore = 1.0;
+	
 	
 	public Long getId() {
 		return id;
@@ -159,6 +166,7 @@ public class Publication {
 		if (obj instanceof Publication) {
 			if (title != null && ((Publication) obj).getTitle() != null) {
 				double titleScore = almostIdentical(title, ((Publication) obj).getTitle());
+				this.titleMatchScore = titleScore;
 				if (titleScore > 0.9) {
 					if (author != null) {
 						if (authorMatch(((Publication) obj).getAuthor())) {
@@ -210,6 +218,7 @@ public class Publication {
 	public boolean journalMatch(Publication publication) {
 		if (this.journalName != null && publication.getJournalName() != null) {
 			double score = almostIdentical (this.journalName, publication.getJournalName());
+			this.journalMatchScore = score;
 			if (score > 0.9) {
 				// check if at least one of year or volume or page range matches
 				if (this.year != null && this.year.equalsIgnoreCase(publication.getYear())) {
@@ -261,6 +270,7 @@ public class Publication {
 	public boolean authorMatch (String author2) {
 		if (this.author != null && author2 != null) {
 			double aScore = almostIdentical(this.author, author2);
+			this.authorMatchScore = aScore;
 			if (aScore > 0.9) return true;
 			// use only last names to match
 			String[] authorList = this.author.split(";");
@@ -282,6 +292,7 @@ public class Publication {
 				lastNames2 += trimmed.trim() + ";";
 			}
 			double score = almostIdentical(lastNames1, lastNames2);
+			this.authorMatchScore = score;
 			if (score > 0.9) return true;
 			else {
 				// check other variations

@@ -400,6 +400,7 @@ public class CFGCurationService {
 	
 	@Transactional
 	public void addPublicationsFromFile (String filename) {
+		PubmedUtil util = new PubmedUtil(apiKey);
 		File file1 = new File (filename);
 		try {
 			Workbook workbook = WorkbookFactory.create(file1);
@@ -460,11 +461,21 @@ public class CFGCurationService {
 		            		if (pubHandle.isPresent()) {
 		            			Publication pub = pubHandle.get();
 		            			if (pub.getPmid() == null && pmid != null && !pmid.isEmpty()) {
+		            				// check the match score 
+		            				Publication p = util.getPublicatonByPMID(pmid);
+		            				try {
+		    					        Thread.sleep(100); // wait 100 milliseconds between requests
+		    					    } catch (InterruptedException e) {
+		    					        Thread.currentThread().interrupt(); // restore interrupted status
+		    					    }
+		            				pub.equals(p);   // to calculate the scores
 		            				pub.setPmid(pmid);
 		            			} else if (pub.getPmid()!= null && pmid != null && !pmid.isEmpty() && !pub.getPmid().equals(pmid)) {
 		            				logger.error("There is a mismatch for pmid for publication " + id);
 		            			}
 		            			if (pub.getDoiId() == null && doi != null && !doi.isEmpty()) {
+		            				Publication p = util.getPublicationByDOI(doi);
+		            				pub.equals(p);
 		            				pub.setDoiId(doi);
 		            			} else if (pub.getDoiId()!= null && doi != null && !doi.isEmpty() && !pub.getDoiId().equals(doi)) {
 		            				logger.error("There is a mismatch for DOI for publication " + id);

@@ -1,5 +1,7 @@
 package org.glygen.cfgcuration.service;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -20,6 +22,7 @@ import org.glygen.cfgcuration.model.Biological;
 import org.glygen.cfgcuration.model.Publication;
 import org.glygen.cfgcuration.model.Structures;
 import org.glygen.cfgcuration.model.mapping.MappingDisease;
+import org.glygen.cfgcuration.model.mapping.MappingOrgan;
 import org.glygen.cfgcuration.model.mapping.MappingScientificName;
 import org.glygen.cfgcuration.model.mapping.MappingTissue;
 import org.glygen.cfgcuration.model.tablemaker.CollectionView;
@@ -51,6 +54,8 @@ public class CFGToTablemakerService {
 	
 	Map<String, String>  glycanGlytoucanMap = new HashMap<>();
 	
+	Map<String, String> carbIdErrorMap = new HashMap<>();
+ 	
 	final StructureRepository structureRepository;
 	final BiologicalRepository biologicalRepository;
 	final PublicationRepository publicationRepository;
@@ -77,6 +82,7 @@ public class CFGToTablemakerService {
 		this.tablemaker.setUserName(userId);
 		this.tablemaker.setPassword(password);
 		List<Structures> structures = structureRepository.findAll();
+		StringBuffer notes = new StringBuffer();
 		for (Structures str: structures) {
 			String carbId = str.getCarb_id();
 
@@ -92,9 +98,10 @@ public class CFGToTablemakerService {
 					logger.error("could not add glycan with glycoCT: " + structure.getGlycoCT(), e);
 				}
 			} else {
+				notes.append("carbId is not found in glycomedb");
 				String seq = str.getLinearcode();
 				if (seq == null) {
-					logger.info("no linearcode for structure: " + str.getCarb_id());
+					notes.append("no linearcode for structure: " + str.getCarb_id());
 					continue;
 				}
 				try {
@@ -110,11 +117,12 @@ public class CFGToTablemakerService {
 					}
 				} catch (Exception e) {
 					// catch DuplicateException
-					
-					logger.error("could not convert sequence to GlycoCT: " + seq, e);
+					carbIdErrorMap.put(carbId, "Sequence cannot be found in converted list and cannot be coverted to GlycoCT");
+					logger.error("could not convert sequence to GlycoCT: " + seq);
 				}
 			}
 		}
+		logger.info ("Glycan results:" + notes);
 	}
 	
 	public void createCollectionsAndPublishDataset () {
@@ -138,6 +146,7 @@ public class CFGToTablemakerService {
 						if (pub.getPmid() == null && pub.getDoiId() == null) {
 							logger.info("There is no pmid for this publication " + pub.getId());
 							notes.append("Not including " + pub.getCarbKey() + " since there is no pmid or doi\n");
+							carbIdErrorMap.put(str.getCarb_id(), "Not including " + pub.getCarbKey() + " since there is no pmid or doi");
 							continue;
 						}
 						// create a collection for each glycan-paper pair
@@ -201,6 +210,7 @@ public class CFGToTablemakerService {
 								}
 							}
 						}
+						boolean tissueAdded = false;
 						if (bio.getTissue() != null) {
 							// find the mapping
 							Optional<MappingTissue> mapping = mappingTissueRepository.findByNameIgnoreCase(bio.getTissue());
@@ -214,13 +224,33 @@ public class CFGToTablemakerService {
 									metadata.setValueId(namespaceId);
 									metadata.setValue(mapping.get().getNamespaceName());
 									collection.getMetadata().add(metadata);
+									tissueAdded = true;
 								}
 							}
 						}
-						//TODO handle organs
+						
+						if (!tissueAdded && bio.getOrgan() != null) {
+							// find the mapping
+							Optional<MappingOrgan> mapping = mappingOrganRepository.findByNameIgnoreCase(bio.getOrgan());
+							if (mapping.isPresent()) {
+								String namespaceId = mapping.get().getNamespaceId();
+								if (namespaceId != null) {
+									Metadata metadata = new Metadata();
+									Datatype datatype = new Datatype();
+									datatype.setDatatypeId(5L);
+									metadata.setType(datatype);
+									metadata.setValueId(namespaceId);
+									metadata.setValue(mapping.get().getNamespaceName());
+									collection.getMetadata().add(metadata);
+								}
+							}
+							
+						}
+						
 						if (collection.getMetadata().isEmpty()) {
 							logger.info ("No metadata for " + str.getCarb_id());
 							notes.append("Not including " +  str.getCarb_key() + " since there is no metadata");
+							carbIdErrorMap.put(str.getCarb_id(), "Not including " +  str.getCarb_key() + " since there is no metadata");
 						} else {
 							//TODO fix contributor information
 							Metadata metadata = new Metadata();
@@ -257,6 +287,22 @@ public class CFGToTablemakerService {
 			
 			this.tablemaker.publishDataset(dataset);
 		}
+		
+		// write carbIdErrorMap to a csv file
+        String filePath = "excluded-list-withreasons.csv";
+
+        try (FileWriter writer = new FileWriter(filePath)) {
+            writer.append("CarbID,Reason\n");
+            for (Map.Entry<String, String> entry : carbIdErrorMap.entrySet()) {
+                writer.append(entry.getKey())
+                      .append(',')
+                      .append(entry.getValue())
+                      .append('\n');
+            }
+        } catch (IOException e) {
+            logger.error("Error writing CSV file: " + e.getMessage());
+        }
+
 		
 	}
 
