@@ -18,6 +18,8 @@ public class Structures {
 	String iupac;
 	@Column
 	String carb_key;
+	@Column
+	String glytoucanId;
 	
 	public String getId() {
 		return id;
@@ -48,5 +50,11 @@ public class Structures {
 	}
 	public void setCarb_key(String carb_key) {
 		this.carb_key = carb_key;
+	}
+	public String getGlytoucanId() {
+		return glytoucanId;
+	}
+	public void setGlytoucanId(String glytoucanId) {
+		this.glytoucanId = glytoucanId;
 	}
 }

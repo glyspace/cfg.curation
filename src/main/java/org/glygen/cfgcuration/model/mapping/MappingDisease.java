@@ -9,7 +9,7 @@ import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name="mapping_disease")
+@Table(name="mapping_disease", schema="raw_cfg")
 public class MappingDisease extends Mapping {
 	
 }

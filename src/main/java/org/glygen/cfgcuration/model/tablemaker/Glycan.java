@@ -1,7 +1,8 @@
 package org.glygen.cfgcuration.model.tablemaker;
 
 public class Glycan {
-   
+	
+	Long glycanId;
     String glytoucanID;
     
     /**
@@ -16,5 +17,11 @@ public class Glycan {
     public void setGlytoucanID(String glytoucanID) {
         this.glytoucanID = glytoucanID;
     }
+	public Long getGlycanId() {
+		return glycanId;
+	}
+	public void setGlycanId(Long glycanId) {
+		this.glycanId = glycanId;
+	}
     
 }

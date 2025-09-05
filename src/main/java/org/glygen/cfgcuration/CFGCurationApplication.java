@@ -53,7 +53,7 @@ public class CFGCurationApplication {
 				service.addPublicationsFromFile(filename);
 			}
 		} else if (args.containsOption("tablemaker")) {
-			tablemaker.createGlycans();
+			//tablemaker.createGlycans();
 			tablemaker.createCollectionsAndPublishDataset();
 		} else {
 			//service.assignCarbKeys();

@@ -1,7 +1,6 @@
 package org.glygen.cfgcuration.dao;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.glygen.cfgcuration.model.Biological;
 import org.springframework.data.jpa.repository.JpaRepository;

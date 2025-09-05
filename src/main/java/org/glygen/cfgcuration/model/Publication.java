@@ -332,4 +332,22 @@ public class Publication {
 		String pub = title+author+journalName+year+pageRange;
 		return pub.hashCode();
 	}
+	public Double getJournalMatchScore() {
+		return journalMatchScore;
+	}
+	public void setJournalMatchScore(Double journalMatchScore) {
+		this.journalMatchScore = journalMatchScore;
+	}
+	public Double getTitleMatchScore() {
+		return titleMatchScore;
+	}
+	public void setTitleMatchScore(Double titleMatchScore) {
+		this.titleMatchScore = titleMatchScore;
+	}
+	public Double getAuthorMatchScore() {
+		return authorMatchScore;
+	}
+	public void setAuthorMatchScore(Double authorMatchScore) {
+		this.authorMatchScore = authorMatchScore;
+	}
 }

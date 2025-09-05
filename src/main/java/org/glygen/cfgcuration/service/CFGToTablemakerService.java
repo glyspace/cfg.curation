@@ -25,12 +25,14 @@ import org.glygen.cfgcuration.model.mapping.MappingDisease;
 import org.glygen.cfgcuration.model.mapping.MappingOrgan;
 import org.glygen.cfgcuration.model.mapping.MappingScientificName;
 import org.glygen.cfgcuration.model.mapping.MappingTissue;
+import org.glygen.cfgcuration.model.tablemaker.CollectionType;
 import org.glygen.cfgcuration.model.tablemaker.CollectionView;
 import org.glygen.cfgcuration.model.tablemaker.DatasetInputView;
 import org.glygen.cfgcuration.model.tablemaker.Datatype;
 import org.glygen.cfgcuration.model.tablemaker.Glycan;
 import org.glygen.cfgcuration.model.tablemaker.License;
 import org.glygen.cfgcuration.model.tablemaker.Metadata;
+import org.glygen.cfgcuration.model.tablemaker.PublicationView;
 import org.glygen.cfgcuration.util.TableMakerAPI;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
@@ -52,7 +54,7 @@ public class CFGToTablemakerService {
 	
 	static Logger logger = org.slf4j.LoggerFactory.getLogger(CFGCurationService.class);
 	
-	Map<String, String>  glycanGlytoucanMap = new HashMap<>();
+	String contributorString = "curatedBy:Sena Arpinar (sena@uga.edu, University of Georgia)|createdWith:GlyTableMaker (https://glygen.ccrc.uga.edu/tablemaker)";
 	
 	Map<String, String> carbIdErrorMap = new HashMap<>();
  	
@@ -83,21 +85,37 @@ public class CFGToTablemakerService {
 		this.tablemaker.setPassword(password);
 		List<Structures> structures = structureRepository.findAll();
 		StringBuffer notes = new StringBuffer();
+		int count = 0;
+		int totalProcessed = 0;
+		int notFoundinGlytoucan = 0;
 		for (Structures str: structures) {
 			String carbId = str.getCarb_id();
 
 			Optional<RemoteStructure>  handle = remoteRepository.findByResourceIdWithStructures(carbId);
 			if (handle.isPresent() && !handle.get().getStructures().isEmpty()) {
+				count++;
+				if (str.getGlytoucanId() != null) {
+					totalProcessed++;
+					continue;
+				}
 				GlycoCTStructure structure = handle.get().getStructures().iterator().next();
 				try {
 					String glytoucanId = this.tablemaker.addGlycanGlycoCT(structure.getGlycoCT());
-					if (glytoucanId != null) {
-						glycanGlytoucanMap.put(str.getCarb_id(), glytoucanId);
+					totalProcessed++;
+					if (glytoucanId != null && glytoucanId.length() < 15) {
+						str.setGlytoucanId(glytoucanId);
+						structureRepository.save(str);
+					} else {
+						notFoundinGlytoucan++;
 					}
 				} catch (Exception e) {
 					logger.error("could not add glycan with glycoCT: " + structure.getGlycoCT(), e);
 				}
 			} else {
+				if (str.getGlytoucanId() != null) {
+					totalProcessed++;
+					continue;
+				}
 				notes.append("carbId is not found in glycomedb");
 				String seq = str.getLinearcode();
 				if (seq == null) {
@@ -112,8 +130,12 @@ public class CFGToTablemakerService {
 						seq = seq.substring(0, seq.indexOf(";"));
 					}
 					String glytoucanId = this.tablemaker.addGlycan(seq);
-					if (glytoucanId != null) {
-						glycanGlytoucanMap.put(str.getCarb_id(), glytoucanId);
+					totalProcessed++;
+					if (glytoucanId != null && glytoucanId.length() < 15) {
+						str.setGlytoucanId(glytoucanId);
+						structureRepository.save(str);
+					} else {
+						notFoundinGlytoucan++;
 					}
 				} catch (Exception e) {
 					// catch DuplicateException
@@ -123,6 +145,9 @@ public class CFGToTablemakerService {
 			}
 		}
 		logger.info ("Glycan results:" + notes);
+		logger.info ("Processed total: " + totalProcessed);
+		logger.info ("Structures with existing glycoCT:" + count);
+		logger.info ("Not found in GlyTouCan: " + notFoundinGlytoucan);
 	}
 	
 	public void createCollectionsAndPublishDataset () {
@@ -132,91 +157,139 @@ public class CFGToTablemakerService {
 		this.tablemaker.setPassword(password);
 		List<Structures> structures = structureRepository.findAll();
 		List<CollectionView> addedCollections = new ArrayList<CollectionView>();
+		List<PublicationView> publications = new ArrayList<>();
 		StringBuffer notes = new StringBuffer();
 		for (Structures str: structures) {
+			String glytoucanId = str.getGlytoucanId();
+			if (glytoucanId == null || glytoucanId.equalsIgnoreCase("null")) {
+				logger.error("No glytoucanId for " + str.getCarb_id());
+				continue;
+			}
+			// find the glycan and use the id
+			Long glycanId = null;
 			try {
-				String glytoucanId = glycanGlytoucanMap.get(str.getCarb_id());
-				if (glytoucanId == null) {
-					logger.error("Could not get glytoucanId for " + str.getCarb_id());
+				glycanId = this.tablemaker.retrieveGlycanByGlytoucanId(glytoucanId);
+			} catch (Exception e) {
+				logger.error("Exception retrieving glycan " + glytoucanId, e);
+			}
+			if (glycanId == null) {
+				logger.error("Cannot find the glycan " + glytoucanId + " in tablemaker ");
+				carbIdErrorMap.put(str.getCarb_id(), "Cannot find the glycan " + glytoucanId + " in tablemaker. Please create glycans first!");
+				continue;
+			}
+			
+			Glycan glycan = new Glycan();
+			glycan.setGlycanId(glycanId);
+			glycan.setGlytoucanID(glytoucanId);
+			
+			if (str.getCarb_key() != null) {
+				List<Publication> pubs = publicationRepository.findByCarbKey(str.getCarb_key());
+				for (Publication pub: pubs) {
+					if (pub.getPmid() == null && pub.getDoiId() == null) {
+						logger.info("There is no pmid for this publication " + pub.getId());
+						notes.append("Not including " + pub.getCarbKey() + " since there is no pmid or doi\n");
+						carbIdErrorMap.put(str.getCarb_id(), "Not including " + pub.getCarbKey() + " since there is no pmid or doi");
+						continue;
+					}
+					// create a collection for each glycan-paper pair
+					CollectionView collection = new CollectionView();
+					collection.setName(str.getCarb_id() + "-" + glytoucanId + "-" + pub.getId());
+					collection.setType(CollectionType.GLYCAN);
+					collection.setGlycans(new ArrayList<>());
+					
+					collection.getGlycans().add(glycan);
+					Metadata metadata = new Metadata();
+					if (pub.getPmid() != null) metadata.setValue(pub.getPmid());
+					else metadata.setValue(pub.getDoiId());
+					Datatype datatype = new Datatype();
+					datatype.setDatatypeId(2L);
+					metadata.setType(datatype);
+					collection.setMetadata(new ArrayList<Metadata>());
+					collection.getMetadata().add(metadata);
+					Metadata contributor = new Metadata();
+					datatype = new Datatype();
+					datatype.setDatatypeId(16L);
+					contributor.setType(datatype);
+					contributor.setValue(contributorString);
+					collection.getMetadata().add(contributor);
+					String id = this.tablemaker.addCollection (collection);
+					if (id != null) collection.setCollectionId(Long.parseLong(id));
+					else {
+						logger.error("failed to create collection " + collection.getName());
+					}
+					addedCollections.add(collection);
+					publications.add(createPublicationView(pub));
+				}
+			}
+				
+			// add a collection for each biological entry
+			List<Biological> bList = biologicalRepository.findByCarbId(str.getCarb_id());
+			for (Biological bio: bList) {
+				CollectionView collection = new CollectionView();
+				collection.setName(str.getCarb_id() + "-" + glytoucanId + "-" + bio.getId());
+				collection.setType(CollectionType.GLYCAN);
+				collection.setGlycans(new ArrayList<>());
+				collection.getGlycans().add(glycan);
+				collection.setMetadata(new ArrayList<Metadata>());
+				if (bio.getScientificname() != null && !bio.getScientificname().equalsIgnoreCase("unknown")) {
+					// find the mapping
+					Optional<MappingScientificName> mapping = mappingSpeciesRepository.findByNameIgnoreCase(bio.getScientificname());
+					if (mapping.isPresent()) {
+						String namespaceId = mapping.get().getNamespaceId();
+						if (namespaceId != null) {
+							Metadata metadata = new Metadata();
+							Datatype datatype = new Datatype();
+							datatype.setDatatypeId(3L);
+							metadata.setType(datatype);
+							metadata.setValueId(namespaceId);
+							metadata.setValue(mapping.get().getNamespaceName());
+							collection.getMetadata().add(metadata);
+						}
+					} else {
+						notes.append("Not including " + str.getCarb_id()  + " with biological entry " + bio.getId() + " since there is no species information");
+						carbIdErrorMap.put(str.getCarb_id(), "Not including " + str.getCarb_id()  + " with biological entry " + bio.getId() + " since there is no species information");
+						continue;
+					}
+				} else {
+					notes.append("Not including " + str.getCarb_id()  + " with biological entry " + bio.getId() + " since there is no species information");
+					carbIdErrorMap.put(str.getCarb_id(), "Not including " + str.getCarb_id()  + " with biological entry " + bio.getId() + " since there is no species information");
 					continue;
 				}
-				if (str.getCarb_key() != null) {
-					List<Publication> pubs = publicationRepository.findByCarbKey(str.getCarb_key());
-					for (Publication pub: pubs) {
-						if (pub.getPmid() == null && pub.getDoiId() == null) {
-							logger.info("There is no pmid for this publication " + pub.getId());
-							notes.append("Not including " + pub.getCarbKey() + " since there is no pmid or doi\n");
-							carbIdErrorMap.put(str.getCarb_id(), "Not including " + pub.getCarbKey() + " since there is no pmid or doi");
-							continue;
+				if (bio.getDisease() != null) {
+					// can have multiple values
+					String disease = bio.getDisease();
+					String[] diseases = disease.split(",");
+					for (String d: diseases) {
+						// find the mapping
+						Optional<MappingDisease> mapping = mappingDiseaseRepository.findByNameIgnoreCase(d.trim());
+						if (mapping.isPresent()) {
+							String namespaceId = mapping.get().getNamespaceId();
+							if (namespaceId != null) {
+								Metadata metadata = new Metadata();
+								Datatype datatype = new Datatype();
+								datatype.setDatatypeId(7L);
+								metadata.setType(datatype);
+								metadata.setValueId(namespaceId);
+								metadata.setValue(mapping.get().getNamespaceName());
+								collection.getMetadata().add(metadata);
+							}
 						}
-						// create a collection for each glycan-paper pair
-						CollectionView collection = new CollectionView();
-						collection.setGlycans(new ArrayList<>());
-						Glycan glycan = new Glycan();
-						glycan.setGlytoucanID(glytoucanId);
-						collection.getGlycans().add(glycan);
-						Metadata metadata = new Metadata();
-						if (pub.getPmid() != null) metadata.setValue(pub.getPmid());
-						else metadata.setValue(pub.getDoiId());
-						Datatype datatype = new Datatype();
-						datatype.setDatatypeId(2L);
-						metadata.setType(datatype);
-						collection.setMetadata(new ArrayList<Metadata>());
-						collection.getMetadata().add(metadata);
-						
-						String id = this.tablemaker.addCollection (collection);
-						collection.setCollectionId(Long.parseLong(id));
-						addedCollections.add(collection);
 					}
-					
-					// add a collection for each biological entry
-					List<Biological> bList = biologicalRepository.findByCarbId(str.getCarb_id());
-					for (Biological bio: bList) {
-						CollectionView collection = new CollectionView();
-						collection.setGlycans(new ArrayList<>());
-						Glycan glycan = new Glycan();
-						glycan.setGlytoucanID(glytoucanId);
-						collection.getGlycans().add(glycan);
-						collection.setMetadata(new ArrayList<Metadata>());
-						if (bio.getScientificname() != null) {
-							// find the mapping
-							Optional<MappingScientificName> mapping = mappingSpeciesRepository.findByNameIgnoreCase(bio.getScientificname());
-							if (mapping.isPresent()) {
-								String namespaceId = mapping.get().getNamespaceId();
-								if (namespaceId != null) {
-									Metadata metadata = new Metadata();
-									Datatype datatype = new Datatype();
-									datatype.setDatatypeId(3L);
-									metadata.setType(datatype);
-									metadata.setValueId(namespaceId);
-									metadata.setValue(mapping.get().getNamespaceName());
-									collection.getMetadata().add(metadata);
-								}
-							}
-						}
-						if (bio.getDisease() != null) {
-							// find the mapping
-							Optional<MappingDisease> mapping = mappingDiseaseRepository.findByNameIgnoreCase(bio.getDisease());
-							if (mapping.isPresent()) {
-								String namespaceId = mapping.get().getNamespaceId();
-								if (namespaceId != null) {
-									Metadata metadata = new Metadata();
-									Datatype datatype = new Datatype();
-									datatype.setDatatypeId(7L);
-									metadata.setType(datatype);
-									metadata.setValueId(namespaceId);
-									metadata.setValue(mapping.get().getNamespaceName());
-									collection.getMetadata().add(metadata);
-								}
-							}
-						}
-						boolean tissueAdded = false;
-						if (bio.getTissue() != null) {
-							// find the mapping
-							Optional<MappingTissue> mapping = mappingTissueRepository.findByNameIgnoreCase(bio.getTissue());
-							if (mapping.isPresent()) {
-								String namespaceId = mapping.get().getNamespaceId();
-								if (namespaceId != null) {
+				}
+				boolean tissueAdded = false;
+				if (bio.getTissue() != null) {
+					// can have multiple values
+					String tissue = bio.getTissue();
+					String[] tissues = tissue.split(",");
+					boolean first = true;
+					for (String t: tissues) {
+						// find the mapping
+						Optional<MappingTissue> mapping = mappingTissueRepository.findByNameIgnoreCase(t.trim());
+						if (mapping.isPresent()) {
+							String namespaceId = mapping.get().getNamespaceId();
+							if (namespaceId != null) {
+								if (first) {
+									collection.setName(str.getCarb_id() + "-" + glytoucanId + "-" + bio.getId() + "-" + t.trim());
 									Metadata metadata = new Metadata();
 									Datatype datatype = new Datatype();
 									datatype.setDatatypeId(5L);
@@ -225,16 +298,56 @@ public class CFGToTablemakerService {
 									metadata.setValue(mapping.get().getNamespaceName());
 									collection.getMetadata().add(metadata);
 									tissueAdded = true;
+									Metadata contributor = new Metadata();
+									datatype = new Datatype();
+									datatype.setDatatypeId(16L);
+									contributor.setType(datatype);
+									contributor.setValue(contributorString);
+									collection.getMetadata().add(contributor);
+									String id = this.tablemaker.addCollection (collection);
+									collection.setCollectionId(Long.parseLong(id));
+									addedCollections.add(collection);
+									first = false;
+								} else {
+									CollectionView collectionCopy = new CollectionView();
+									collectionCopy.setName(str.getCarb_id() + "-" + glytoucanId + "-" + bio.getId() + "-" + t.trim());
+									collectionCopy.setType(CollectionType.GLYCAN);
+									collectionCopy.setGlycans(collection.getGlycans());
+									collectionCopy.setMetadata(new ArrayList<>());
+									for (Metadata m: collection.getMetadata()) {
+										if (m.getType().getDatatypeId() != 5L) {  // copy everything other than tissue
+											collectionCopy.getMetadata().add(m);
+										}
+									}
+									Metadata metadata = new Metadata();
+									Datatype datatype = new Datatype();
+									datatype.setDatatypeId(5L);
+									metadata.setType(datatype);
+									metadata.setValueId(namespaceId);
+									metadata.setValue(mapping.get().getNamespaceName());
+									collectionCopy.getMetadata().add(metadata);
+									String id = this.tablemaker.addCollection (collectionCopy);
+									collectionCopy.setCollectionId(Long.parseLong(id));
+									addedCollections.add(collectionCopy);
 								}
 							}
 						}
-						
-						if (!tissueAdded && bio.getOrgan() != null) {
-							// find the mapping
-							Optional<MappingOrgan> mapping = mappingOrganRepository.findByNameIgnoreCase(bio.getOrgan());
-							if (mapping.isPresent()) {
-								String namespaceId = mapping.get().getNamespaceId();
-								if (namespaceId != null) {
+					}
+				}
+				
+				if (!tissueAdded && bio.getOrgan() != null) {
+					// can have multiple values
+					String organ = bio.getOrgan();
+					String[] organs = organ.split(",");
+					boolean first = true;
+					for (String o: organs) {
+						// find the mapping
+						Optional<MappingOrgan> mapping = mappingOrganRepository.findByNameIgnoreCase(o.trim());
+						if (mapping.isPresent()) {
+							String namespaceId = mapping.get().getNamespaceId();
+							if (namespaceId != null) {
+								if (first) {
+									collection.setName(str.getCarb_id() + "-" + glytoucanId + "-" + bio.getId() + "-" + o.trim());
 									Metadata metadata = new Metadata();
 									Datatype datatype = new Datatype();
 									datatype.setDatatypeId(5L);
@@ -242,33 +355,63 @@ public class CFGToTablemakerService {
 									metadata.setValueId(namespaceId);
 									metadata.setValue(mapping.get().getNamespaceName());
 									collection.getMetadata().add(metadata);
+									tissueAdded = true;
+									Metadata contributor = new Metadata();
+									datatype = new Datatype();
+									datatype.setDatatypeId(16L);
+									contributor.setType(datatype);
+									contributor.setValue(contributorString);
+									collection.getMetadata().add(contributor);
+									String id = this.tablemaker.addCollection (collection);
+									collection.setCollectionId(Long.parseLong(id));
+									addedCollections.add(collection);
+									first = false;
+								} else {
+									CollectionView collectionCopy = new CollectionView();
+									collectionCopy.setName(str.getCarb_id() + "-" + glytoucanId + "-" + bio.getId() + "-" + o.trim());
+									collectionCopy.setType(CollectionType.GLYCAN);
+									collectionCopy.setGlycans(collection.getGlycans());
+									collectionCopy.setMetadata(new ArrayList<>());
+									for (Metadata m: collection.getMetadata()) {
+										if (m.getType().getDatatypeId() != 5L) {  // copy everything other than tissue
+											collectionCopy.getMetadata().add(m);
+										}
+									}
+									Metadata metadata = new Metadata();
+									Datatype datatype = new Datatype();
+									datatype.setDatatypeId(5L);
+									metadata.setType(datatype);
+									metadata.setValueId(namespaceId);
+									metadata.setValue(mapping.get().getNamespaceName());
+									collectionCopy.getMetadata().add(metadata);
+									String id = this.tablemaker.addCollection (collectionCopy);
+									collectionCopy.setCollectionId(Long.parseLong(id));
+									addedCollections.add(collectionCopy);
 								}
 							}
-							
 						}
-						
-						if (collection.getMetadata().isEmpty()) {
-							logger.info ("No metadata for " + str.getCarb_id());
-							notes.append("Not including " +  str.getCarb_key() + " since there is no metadata");
-							carbIdErrorMap.put(str.getCarb_id(), "Not including " +  str.getCarb_key() + " since there is no metadata");
-						} else {
-							//TODO fix contributor information
-							Metadata metadata = new Metadata();
-							Datatype datatype = new Datatype();
-							datatype.setDatatypeId(30L);
-							metadata.setType(datatype);
-							metadata.setValue("curatedBy:Sena Arpinar (sena@uga.edu, University of Georgia)|createdWith:GlyTableMaker (https://glygen.ccrc.uga.edu/tablemaker)");
-							collection.getMetadata().add(metadata);
-							String id = this.tablemaker.addCollection (collection);
-							collection.setCollectionId(Long.parseLong(id));
-							addedCollections.add(collection);
-						}
-
 					}
+					
 				}
 				
-			} catch (Exception e) {
-				logger.error("could not convert sequence to GlycoCT: " + str.getLinearcode(), e);
+				if (collection.getMetadata().isEmpty()) {
+					logger.info ("No metadata for " + str.getCarb_id());
+					notes.append("Not including " +  str.getCarb_key() + " since there is no metadata");
+					carbIdErrorMap.put(str.getCarb_id(), "Not including " +  str.getCarb_key() + " since there is no metadata");
+				} else {
+					if (!addedCollections.contains(collection)) {
+						Metadata metadata = new Metadata();
+						Datatype datatype = new Datatype();
+						datatype.setDatatypeId(16L);
+						metadata.setType(datatype);
+						metadata.setValue(contributorString);
+						collection.getMetadata().add(metadata);
+						String id = this.tablemaker.addCollection (collection);
+						collection.setCollectionId(Long.parseLong(id));
+						addedCollections.add(collection);
+					}
+				}
+
 			}
 		}
 		
@@ -284,6 +427,7 @@ public class CFGToTablemakerService {
 			dataset.getLicense().setDistribution("No additional restrictions — You may not apply legal terms or technological measures that legally restrict others from doing anything the license permits.");
 			dataset.setNotes(notes.toString());
 			dataset.setCollections(addedCollections);
+			dataset.setPublications(publications);
 			
 			this.tablemaker.publishDataset(dataset);
 		}
@@ -304,6 +448,22 @@ public class CFGToTablemakerService {
         }
 
 		
+	}
+
+	private PublicationView createPublicationView(Publication pub) {
+		PublicationView view = new PublicationView();
+		view.setPubmedId(pub.getPmid());
+		view.setDoiId(pub.getDoiId());
+		view.setAuthors(pub.getAuthor());
+		view.setTitle(pub.getTitle());
+		view.setJournal(pub.getJournalName());
+		if (pub.getYear() != null) view.setYear(Integer.parseInt(pub.getYear()));
+		view.setVolume(pub.getVolume());
+		if (pub.getPageRange() != null && pub.getPageRange().contains("-")) {
+			view.setStartPage(pub.getPageRange().substring(0, pub.getPageRange().indexOf("-")));
+			view.setEndPage(pub.getPageRange().substring(pub.getPageRange().indexOf("-")+1));
+		}
+		return view;
 	}
 
 }

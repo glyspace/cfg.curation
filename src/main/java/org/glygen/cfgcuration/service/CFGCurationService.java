@@ -58,6 +58,7 @@ import org.glygen.cfgcuration.model.mapping.MappingOrgan;
 import org.glygen.cfgcuration.model.mapping.MappingScientificName;
 import org.glygen.cfgcuration.model.mapping.MappingTissue;
 import org.glygen.cfgcuration.util.CrossRefAPI;
+import org.glygen.cfgcuration.util.ElsevierAPIUtil;
 import org.glygen.cfgcuration.util.PubmedUtil;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
@@ -75,6 +76,9 @@ public class CFGCurationService {
 	
 	@Value("${ncbi.api-key}")
 	String apiKey;
+	
+	@Value("${elsevier.api-key}")
+	String apiKey2;
 	
 	static Logger logger = org.slf4j.LoggerFactory.getLogger(CFGCurationService.class);
 	
@@ -455,27 +459,29 @@ public class CFGCurationService {
 	            			continue;
 	            		}
 	            	}
-	            	if ((pmid != null && !pmid.isEmpty()) || (doi != null && !doi.isEmpty())) {
+	            	if ((pmid != null && !pmid.isEmpty() && !pmid.contains("-") && !pmid.contains("—")) || (doi != null && !doi.isEmpty() && !doi.trim().equals("-") && !doi.trim().equals("—"))) {
 		            	try {
 		            		Optional<Publication> pubHandle = publicationRepository.findById(Long.parseLong(id));
 		            		if (pubHandle.isPresent()) {
 		            			Publication pub = pubHandle.get();
+		            			// check the match score 
+	            				Publication p = null;
+	            				if (pmid != null && !pmid.isEmpty())
+	            					p = util.getPublicatonByPMID(pmid);
+	            				else p = util.getPublicationByDOI(doi);
+	            				try {
+	    					        Thread.sleep(100); // wait 100 milliseconds between requests
+	    					    } catch (InterruptedException e) {
+	    					        Thread.currentThread().interrupt(); // restore interrupted status
+	    					    }
+	            				pub.equals(p);   // to calculate the scores
 		            			if (pub.getPmid() == null && pmid != null && !pmid.isEmpty()) {
-		            				// check the match score 
-		            				Publication p = util.getPublicatonByPMID(pmid);
-		            				try {
-		    					        Thread.sleep(100); // wait 100 milliseconds between requests
-		    					    } catch (InterruptedException e) {
-		    					        Thread.currentThread().interrupt(); // restore interrupted status
-		    					    }
-		            				pub.equals(p);   // to calculate the scores
+		            				
 		            				pub.setPmid(pmid);
 		            			} else if (pub.getPmid()!= null && pmid != null && !pmid.isEmpty() && !pub.getPmid().equals(pmid)) {
 		            				logger.error("There is a mismatch for pmid for publication " + id);
 		            			}
 		            			if (pub.getDoiId() == null && doi != null && !doi.isEmpty()) {
-		            				Publication p = util.getPublicationByDOI(doi);
-		            				pub.equals(p);
 		            				pub.setDoiId(doi);
 		            			} else if (pub.getDoiId()!= null && doi != null && !doi.isEmpty() && !pub.getDoiId().equals(doi)) {
 		            				logger.error("There is a mismatch for DOI for publication " + id);
@@ -684,6 +690,7 @@ public class CFGCurationService {
 	public void addPMIDs () {
 		// add pmids
 		PubmedUtil util = new PubmedUtil(apiKey);
+		ElsevierAPIUtil util3 = new ElsevierAPIUtil(apiKey2);
 		CrossRefAPI util2 = new CrossRefAPI();
 		// go through existing ones and assign pmid if not assigned
 		List<Publication> allPublications = publicationRepository.findAll();
@@ -692,7 +699,8 @@ public class CFGCurationService {
 				// check Pubmed to see if we can get the pmid
 				try {
 					if (pub.getChecked() == null || !pub.getChecked()) {
-						List<Publication> matches = util.getPublicationByTitle(pub.getTitle());
+						//List<Publication> matches = util.getPublicationByTitle(pub.getTitle());
+						List<Publication> matches = new ArrayList<>();
 						pub.setMatchCount(matches.size()+"");
 						if (!matches.isEmpty()) {
 							for (Publication m: matches) {
@@ -742,7 +750,43 @@ public class CFGCurationService {
 									pub.setChecked(true);
 								}
 							}
-							if (pub.getPmid() == null) {
+							if (pub.getPmid() == null && pub.getDoiId() == null) {
+								// check Elsevier API
+								List<Publication> scienceDirectMatches = util3.getPublicationByTitle(pub.getTitle());
+								pub.setMatchCount(scienceDirectMatches.size()+"");
+								if (!scienceDirectMatches.isEmpty()) {
+									for (Publication m: scienceDirectMatches) {
+										if (pub.equals(m)) {
+											pub.setPmid(m.getPmid());
+											pub.setDoiId(m.getDoiId());
+											break;
+										}
+									}
+								}
+								if (pub.getDoiId() == null) {
+									if (scienceDirectMatches.size() == 1) {
+										Publication m = scienceDirectMatches.get(0);
+										if (m.getTitle() != null && m.getTitle().equalsIgnoreCase(pub.getTitle())) {
+											pub.setMatchDetails("Single ScienceDirect Match: " + m.getDoiId() + "; Title matched, ");
+											if (m.authorMatch(pub.getAuthor())) {
+												pub.setMatchDetails(pub.getMatchDetails() + "Authors matched, ");
+											} else {
+												pub.setMatchDetails(pub.getMatchDetails() + " Authors did not match: " + m.getAuthor() + ",");
+											}
+											if (m.journalMatch(pub)) {
+												pub.setMatchDetails(pub.getMatchDetails() + "Journal matched, ");
+											} else {
+												pub.setMatchDetails(pub.getMatchDetails() + " Journal did not match: " + 
+														m.getJournalName() + " (" + m.getYear() + ") " + m.getVolume() + ": " + m.getPageRange() + ", ");
+											}
+											pub.setMatchDetails(pub.getMatchDetails().trim());
+										}
+									} else {
+										pub.setMatchDetails("Multiple results from ScienceDirect. None matched");
+									}
+								}
+							}
+							if (pub.getPmid() == null && pub.getDoiId() == null) {
 								// check crossRef to find matches
 								List<Publication> crossRefMatches = util2.getPublicationByTitle(pub.getTitle());
 								pub.setMatchCount(crossRefMatches.size()+"");

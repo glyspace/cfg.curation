@@ -1,5 +1,8 @@
 package org.glygen.cfgcuration;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import javax.sql.DataSource;
 
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -45,6 +48,14 @@ public class SecondaryDatasourceConfig {
           = new HibernateJpaVendorAdapter();
         em.setJpaVendorAdapter(vendorAdapter);
         em.setPersistenceUnitName("secondary");
+
+        // Set Hibernate properties
+		Map<String, Object> properties = new HashMap<>();
+		properties.put("hibernate.hbm2ddl.auto", "none"); // Prevent schema updates
+		properties.put("hibernate.connection.readOnly", true); // Optional: mark connection as read-only
+		
+		em.setJpaPropertyMap(properties);
+
         return em;
     }
 

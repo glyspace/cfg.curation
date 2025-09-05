@@ -1,6 +1,7 @@
 package org.glygen.cfgcuration;
 
 import java.util.HashMap;
+import java.util.Map;
 
 import javax.sql.DataSource;
 
@@ -56,6 +57,11 @@ public class PrimaryDatasourceConfig {
           = new HibernateJpaVendorAdapter();
         em.setJpaVendorAdapter(vendorAdapter);
         em.setPersistenceUnitName("primary");
+
+        Map<String, Object> properties = new HashMap<>();
+        properties.put("hibernate.hbm2ddl.auto", "update");
+        em.setJpaPropertyMap(properties);
+
         return em;
     }
     

@@ -6,7 +6,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name="biological")
+@Table(name="biological", schema="raw_cfg")
 public class Biological {
 	
 	@Id

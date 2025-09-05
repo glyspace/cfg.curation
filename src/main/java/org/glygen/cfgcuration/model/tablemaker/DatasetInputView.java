@@ -8,6 +8,7 @@ public class DatasetInputView {
 	String notes;
 	License license;
 	List<CollectionView> collections;
+	List<PublicationView> publications;
 	
 	public String getName() {
 		return name;
@@ -42,5 +43,11 @@ public class DatasetInputView {
 
 	public void setNotes(String notes) {
 		this.notes = notes;
+	}
+	public List<PublicationView> getPublications() {
+		return publications;
+	}
+	public void setPublications(List<PublicationView> publications) {
+		this.publications = publications;
 	}
 }

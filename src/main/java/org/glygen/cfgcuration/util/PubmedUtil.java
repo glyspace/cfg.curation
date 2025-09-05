@@ -383,6 +383,7 @@ public class PubmedUtil {
 
 		try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
 	        HttpGet request = new HttpGet(pubUrl);
+	        request.setHeader("Accept", "application/vnd.citationstyles.csl+json");
 	        HttpResponse response = httpClient.execute(request);
 	        if (response.getStatusLine().getStatusCode() > 300) {
 	        	throw new IOException ("Error getting the publication with DOI: " + response.getStatusLine().getReasonPhrase());
