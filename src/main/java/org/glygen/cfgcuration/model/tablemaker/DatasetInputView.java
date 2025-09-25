@@ -9,6 +9,8 @@ public class DatasetInputView {
 	License license;
 	List<CollectionView> collections;
 	List<PublicationView> publications;
+	List<Grant> grants;
+	List<PublicationView> associatedPapers;
 	
 	public String getName() {
 		return name;
@@ -49,5 +51,17 @@ public class DatasetInputView {
 	}
 	public void setPublications(List<PublicationView> publications) {
 		this.publications = publications;
+	}
+	public List<Grant> getGrants() {
+		return grants;
+	}
+	public void setGrants(List<Grant> grants) {
+		this.grants = grants;
+	}
+	public List<PublicationView> getAssociatedPapers() {
+		return associatedPapers;
+	}
+	public void setAssociatedPapers(List<PublicationView> associatedPapers) {
+		this.associatedPapers = associatedPapers;
 	}
 }
