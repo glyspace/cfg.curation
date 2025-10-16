@@ -1,5 +1,6 @@
 package org.glygen.cfgcuration.service;
 
+import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -105,9 +106,12 @@ public class CFGToTablemakerService {
 			Optional<RemoteStructure>  handle = remoteRepository.findByResourceIdWithStructures(carbId);
 			if (handle.isPresent() && !handle.get().getStructures().isEmpty()) {
 				count++;
-				if (str.getGlytoucanId() != null) {
+				/*if (str.getGlytoucanId() != null) {
 					totalProcessed++;
 					continue;
+				}*/
+				if (count % 100 == 0) {
+					logger.info (count + ": adding glycan " + carbId);
 				}
 				GlycoCTStructure structure = handle.get().getStructures().iterator().next();
 				try {
@@ -123,10 +127,11 @@ public class CFGToTablemakerService {
 					logger.error("could not add glycan with glycoCT: " + structure.getGlycoCT(), e);
 				}
 			} else {
-				if (str.getGlytoucanId() != null) {
+				/*if (str.getGlytoucanId() != null) {
 					totalProcessed++;
 					continue;
-				}
+				}*/
+				logger.info ("carbId is not found in glycomedb");
 				notes.append("carbId is not found in glycomedb");
 				String seq = str.getLinearcode();
 				if (seq == null) {
@@ -159,6 +164,17 @@ public class CFGToTablemakerService {
 		logger.info ("Processed total: " + totalProcessed);
 		logger.info ("Structures with existing glycoCT:" + count);
 		logger.info ("Not found in GlyTouCan: " + notFoundinGlytoucan);
+		
+		 
+        try {
+        	String filePath = "glycan_errorlog.txt"; 
+			BufferedWriter writer = new BufferedWriter(new FileWriter(filePath, true));
+			writer.write(notes.toString());
+			writer.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 	
 	public void createCollectionsAndPublishDataset () {

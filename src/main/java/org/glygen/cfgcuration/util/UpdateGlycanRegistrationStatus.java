@@ -28,6 +28,7 @@ public class UpdateGlycanRegistrationStatus {
 			Workbook workbook = WorkbookFactory.create(file1);
 			Sheet glycans = workbook.getSheetAt(0);
 			Iterator<Row> rowIterator = glycans.iterator();
+			rowIterator.next(); // skip header line
 			while (rowIterator.hasNext()) {
 	            Row row = rowIterator.next();
 	            Cell glytoucanIdCell = row.getCell(0);
@@ -42,7 +43,7 @@ public class UpdateGlycanRegistrationStatus {
 	        String filePath = "updateGlycanStatus.sql";
 	        try (FileWriter writer = new FileWriter(filePath)) {
 	            for (Map.Entry<String, String> entry : glycanStatus.entrySet()) {
-	                writer.append("update glycans set status='" + entry.getValue() + "' where glytoucanid = '" + entry.getKey() + "'\n");
+	                writer.append("update glycans set status='" + entry.getValue() + "' where glytoucanid = '" + entry.getKey() + "';\n");
 	            }
 	        }
 		} catch (Exception e) {
