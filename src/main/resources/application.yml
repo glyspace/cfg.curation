@@ -20,6 +20,6 @@ elsevier:
   api-key: ENC(opugcA1Xj2wFlu8T1uHurFH+PcWY4XvqcSiTzjeCQ/ClSvO5FfEYm9oYgWptly1U)
   
 tablemaker:
-  api-url: http://localhost:8080/
+  api-url: https://glygen.ccrc.uga.edu/tablemaker/api/
   user-id: cfgdata
   password: ENC(K7VPLELDFUvhkAWh1QjpKxy4JJHduoIm)
