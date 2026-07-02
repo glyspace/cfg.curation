@@ -23,3 +23,4 @@ tablemaker:
   api-url: https://glygen.ccrc.uga.edu/tablemaker/api/
   user-id: cfgdata
   password: ENC(K7VPLELDFUvhkAWh1QjpKxy4JJHduoIm)
+  version: v2.0
