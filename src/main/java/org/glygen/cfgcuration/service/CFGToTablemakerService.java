@@ -56,6 +56,9 @@ public class CFGToTablemakerService {
     @Value("${tablemaker.user-id}")
     String userId;
     
+    @Value("${tablemaker.version}")
+    String version;
+    
     TableMakerAPI tablemaker;
 	
 	static Logger logger = org.slf4j.LoggerFactory.getLogger(CFGCurationService.class);
@@ -106,25 +109,28 @@ public class CFGToTablemakerService {
 			Optional<RemoteStructure>  handle = remoteRepository.findByResourceIdWithStructures(carbId);
 			if (handle.isPresent() && !handle.get().getStructures().isEmpty()) {
 				count++;
-				/*if (str.getGlytoucanId() != null) {
-					totalProcessed++;
-					continue;
-				}*/
 				if (count % 100 == 0) {
 					logger.info (count + ": adding glycan " + carbId);
 				}
-				GlycoCTStructure structure = handle.get().getStructures().iterator().next();
-				try {
-					String glytoucanId = this.tablemaker.addGlycanGlycoCT(structure.getGlycoCT());
-					totalProcessed++;
-					if (glytoucanId != null && glytoucanId.length() < 15) {
-						str.setGlytoucanId(glytoucanId);
-						structureRepository.save(str);
-					} else {
-						notFoundinGlytoucan++;
+				
+				RemoteStructure remote = handle.get();
+				for (GlycoCTStructure structure: remote.getStructures()) {
+					try {
+						String glytoucanId = this.tablemaker.addGlycanGlycoCT(structure.getGlycoCT());
+						totalProcessed++;
+						if (glytoucanId != null && glytoucanId.length() < 15) {
+							if (str.getGlytoucanId() != null && !str.getGlytoucanId().isEmpty()) {
+								str.setGlytoucanId(str.getGlytoucanId() + "|" + glytoucanId);
+							} else {
+								str.setGlytoucanId(glytoucanId);
+							}
+							structureRepository.save(str);
+						} else {
+							notFoundinGlytoucan++;
+						}
+					} catch (Exception e) {
+						logger.error("could not add glycan with glycoCT: " + structure.getGlycoCT(), e);
 					}
-				} catch (Exception e) {
-					logger.error("could not add glycan with glycoCT: " + structure.getGlycoCT(), e);
 				}
 			} else {
 				/*if (str.getGlytoucanId() != null) {
@@ -193,23 +199,30 @@ public class CFGToTablemakerService {
 				logger.error("No glytoucanId for " + str.getCarb_id());
 				continue;
 			}
-			// find the glycan and use the id
-			Long glycanId = null;
-			try {
-				glycanId = this.tablemaker.retrieveGlycanByGlytoucanId(glytoucanId);
-			} catch (Exception e) {
-				logger.error("Exception retrieving glycan " + glytoucanId, e);
-			}
-			if (glycanId == null) {
-				logger.error("Cannot find the glycan " + glytoucanId + " in tablemaker ");
-				carbIdErrorMap.put(str.getCarb_id(), "Cannot find the glycan " + glytoucanId + " in tablemaker. Please create glycans first!");
-				continue;
-			}
+			String[] glycanList = glytoucanId.split("|");
 			
-			Glycan glycan = new Glycan();
-			glycan.setGlycanId(glycanId);
-			glycan.setGlytoucanID(glytoucanId);
+			List<Glycan> glycans = new ArrayList<>();
 			
+			for (String gt: glycanList) {
+				// find the glycan and use the id
+				Long glycanId = null;
+				try {
+					glycanId = this.tablemaker.retrieveGlycanByGlytoucanId(gt);
+				} catch (Exception e) {
+					logger.error("Exception retrieving glycan " + gt, e);
+				}
+				if (glycanId == null) {
+					logger.error("Cannot find the glycan " + gt + " in tablemaker ");
+					carbIdErrorMap.put(str.getCarb_id(), "Cannot find the glycan " + gt + " in tablemaker. Please create glycans first!");
+					continue;
+				}
+				
+				Glycan glycan = new Glycan();
+				glycan.setGlycanId(glycanId);
+				glycan.setGlytoucanID(gt);
+				glycans.add(glycan);
+			}
+				
 			if (str.getCarb_key() != null) {
 				List<Publication> pubs = publicationRepository.findByCarbKey(str.getCarb_key());
 				for (Publication pub: pubs) {
@@ -221,11 +234,10 @@ public class CFGToTablemakerService {
 					}
 					// create a collection for each glycan-paper pair
 					CollectionView collection = new CollectionView();
-					collection.setName(str.getCarb_id() + "-" + glytoucanId + "-" + pub.getId());
+					collection.setName(version+str.getCarb_id() + "-" + glytoucanId + "-" + pub.getId());
 					collection.setType(CollectionType.GLYCAN);
-					collection.setGlycans(new ArrayList<>());
+					collection.setGlycans(glycans);
 					
-					collection.getGlycans().add(glycan);
 					Metadata metadata = new Metadata();
 					if (pub.getPmid() != null) metadata.setValue(pub.getPmid());
 					else metadata.setValue(pub.getDoiId());
@@ -261,10 +273,10 @@ public class CFGToTablemakerService {
 			List<Biological> bList = biologicalRepository.findByCarbId(str.getCarb_id());
 			for (Biological bio: bList) {
 				CollectionView collection = new CollectionView();
-				collection.setName(str.getCarb_id() + "-" + glytoucanId + "-" + bio.getId());
+				collection.setName(version+str.getCarb_id() + "-" + glytoucanId + "-" + bio.getId());
 				collection.setType(CollectionType.GLYCAN);
-				collection.setGlycans(new ArrayList<>());
-				collection.getGlycans().add(glycan);
+				collection.setGlycans(glycans);
+				
 				collection.setMetadata(new ArrayList<Metadata>());
 				if (bio.getScientificname() != null && !bio.getScientificname().equalsIgnoreCase("unknown")) {
 					// find the mapping
@@ -324,7 +336,7 @@ public class CFGToTablemakerService {
 							String namespaceId = mapping.get().getNamespaceId();
 							if (namespaceId != null) {
 								if (first) {
-									collection.setName(str.getCarb_id() + "-" + glytoucanId + "-" + bio.getId() + "-" + t.trim());
+									collection.setName(version+str.getCarb_id() + "-" + glytoucanId + "-" + bio.getId() + "-" + t.trim());
 									Metadata metadata = new Metadata();
 									Datatype datatype = new Datatype();
 									datatype.setDatatypeId(5L);
@@ -345,7 +357,7 @@ public class CFGToTablemakerService {
 									first = false;
 								} else {
 									CollectionView collectionCopy = new CollectionView();
-									collectionCopy.setName(str.getCarb_id() + "-" + glytoucanId + "-" + bio.getId() + "-" + t.trim());
+									collectionCopy.setName(version+str.getCarb_id() + "-" + glytoucanId + "-" + bio.getId() + "-" + t.trim());
 									collectionCopy.setType(CollectionType.GLYCAN);
 									collectionCopy.setGlycans(collection.getGlycans());
 									collectionCopy.setMetadata(new ArrayList<>());
@@ -382,7 +394,7 @@ public class CFGToTablemakerService {
 							String namespaceId = mapping.get().getNamespaceId();
 							if (namespaceId != null) {
 								if (first) {
-									collection.setName(str.getCarb_id() + "-" + glytoucanId + "-" + bio.getId() + "-" + o.trim());
+									collection.setName(version+str.getCarb_id() + "-" + glytoucanId + "-" + bio.getId() + "-" + o.trim());
 									Metadata metadata = new Metadata();
 									Datatype datatype = new Datatype();
 									datatype.setDatatypeId(5L);
@@ -403,7 +415,7 @@ public class CFGToTablemakerService {
 									first = false;
 								} else {
 									CollectionView collectionCopy = new CollectionView();
-									collectionCopy.setName(str.getCarb_id() + "-" + glytoucanId + "-" + bio.getId() + "-" + o.trim());
+									collectionCopy.setName(version+str.getCarb_id() + "-" + glytoucanId + "-" + bio.getId() + "-" + o.trim());
 									collectionCopy.setType(CollectionType.GLYCAN);
 									collectionCopy.setGlycans(collection.getGlycans());
 									collectionCopy.setMetadata(new ArrayList<>());
@@ -451,44 +463,49 @@ public class CFGToTablemakerService {
 		}
 		
 		if (!addedCollections.isEmpty()) {
-			DatasetInputView dataset = new DatasetInputView();
-			dataset.setName("CFG Glycomics Data");
-			dataset.setDescription("The glycomics data generated by the Consortium for Functional Glycomics "
-					+ "(CFG) encompasses a broad spectrum of experimental and curated datasets "
-					+ "aimed at understanding the roles of glycans in biology. CFG has produced "
-					+ "glycan datasets from glycan profiling, glycan array and phenotyping of glycogene "
-					+ "mouse strains. The CFG also maintained detailed Molecule Pages that catalog "
-					+ "glycan structures, glycan-binding proteins, and glycosyltransferases, providing a "
-					+ "rich resource for glycoinformatics and structural glycobiology. The glycan data, "
-					+ "including glycan structures, their biological annotation and literature references "
-					+ "are archived in this GlyTableMaker dataset.");
-			dataset.setLicense(new License());
-			dataset.getLicense().setId(2L);
-			dataset.getLicense().setName("CC BY 4.0");
-			dataset.getLicense().setUrl("https://creativecommons.org/licenses/by/4.0/");
-			dataset.getLicense().setCommercialUse(true);
-			dataset.getLicense().setAttribution("You must give appropriate credit , provide a link to the license, and indicate if changes were made . You may do so in any reasonable manner, but not in any way that suggests the licensor endorses you or your use.");
-			dataset.getLicense().setDistribution("No additional restrictions — You may not apply legal terms or technological measures that legally restrict others from doing anything the license permits.");
-			//dataset.setNotes(notes.toString());  // it is too long
-			dataset.setCollections(addedCollections);
-			dataset.setPublications(publications);
-			dataset.setGrants(new ArrayList<>());
-			Grant grant = new Grant();
-			grant.setFundingOrganization("NIH");
-			grant.setIdentifier("U54 GM62113");
-			grant.setTitle("Consortium for Functional Glycomics (CFG)");
-			dataset.getGrants().add(grant);
-			
-			
-			try {
-				Publication associatedPaper = util.getPublicatonByPMID("16478800");
-				dataset.setAssociatedPapers(new ArrayList<>());
-				dataset.getAssociatedPapers().add(createPublicationView(associatedPaper, util));
-			} catch (Exception ie) {
-				logger.error("Could not find publication from PubMed ", ie);
+			if (version != null && !version.equalsIgnoreCase("v1.0")) {
+				// TODO create a new version
+				
+				
+			} else {
+				//initial version
+				DatasetInputView dataset = new DatasetInputView();
+				dataset.setName("CFG Glycomics Data");
+				dataset.setDescription("The glycomics data generated by the Consortium for Functional Glycomics "
+						+ "(CFG) encompasses a broad spectrum of experimental and curated datasets "
+						+ "aimed at understanding the roles of glycans in biology. CFG has produced "
+						+ "glycan datasets from glycan profiling, glycan array and phenotyping of glycogene "
+						+ "mouse strains. The CFG also maintained detailed Molecule Pages that catalog "
+						+ "glycan structures, glycan-binding proteins, and glycosyltransferases, providing a "
+						+ "rich resource for glycoinformatics and structural glycobiology. The glycan data, "
+						+ "including glycan structures, their biological annotation and literature references "
+						+ "are archived in this GlyTableMaker dataset.");
+				dataset.setLicense(new License());
+				dataset.getLicense().setId(2L);
+				dataset.getLicense().setName("CC BY 4.0");
+				dataset.getLicense().setUrl("https://creativecommons.org/licenses/by/4.0/");
+				dataset.getLicense().setCommercialUse(true);
+				dataset.getLicense().setAttribution("You must give appropriate credit , provide a link to the license, and indicate if changes were made . You may do so in any reasonable manner, but not in any way that suggests the licensor endorses you or your use.");
+				dataset.getLicense().setDistribution("No additional restrictions — You may not apply legal terms or technological measures that legally restrict others from doing anything the license permits.");
+				//dataset.setNotes(notes.toString());  // it is too long
+				dataset.setCollections(addedCollections);
+				dataset.setPublications(publications);
+				dataset.setGrants(new ArrayList<>());
+				Grant grant = new Grant();
+				grant.setFundingOrganization("NIH");
+				grant.setIdentifier("U54 GM62113");
+				grant.setTitle("Consortium for Functional Glycomics (CFG)");
+				dataset.getGrants().add(grant);
+				try {
+					Publication associatedPaper = util.getPublicatonByPMID("16478800");
+					dataset.setAssociatedPapers(new ArrayList<>());
+					dataset.getAssociatedPapers().add(createPublicationView(associatedPaper, util));
+				} catch (Exception ie) {
+					logger.error("Could not find publication from PubMed ", ie);
+				}
+				
+				this.tablemaker.publishDataset(dataset);
 			}
-			
-			this.tablemaker.publishDataset(dataset);
 		}
 		
 		// write carbIdErrorMap to a csv file

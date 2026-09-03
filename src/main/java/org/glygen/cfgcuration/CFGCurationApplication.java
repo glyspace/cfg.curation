@@ -46,7 +46,7 @@ public class CFGCurationApplication {
 			List<String> tablenames = args.getOptionValues("compare");
 			List<String> filenames = args.getOptionValues("file");
 			List<Mapping> mappings = new ComparisonUtil().compareFiles(filenames, tablenames.get(0));
-			//service.updateMappings(mappings, tablenames.get(0));
+			service.updateMappings(mappings, tablenames.get(0));
 		} else if (args.containsOption("publication")) {
 			List<String> filenames = args.getOptionValues("file");
 			for (String filename: filenames) {
@@ -62,7 +62,6 @@ public class CFGCurationApplication {
 			//service.createMappingTables();
 			//service.addInformationToMappingTables();
 			//service.addPMIDs();
-			//service.generateExcelFiles();
 			//service.regenerateScientificNameMapping();
 			service.generateExcelFiles();
 			service.generateMappedExcel();
