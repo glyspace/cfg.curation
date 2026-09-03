@@ -471,9 +471,15 @@ public class PubmedUtil {
     }
     
     public List<Species> getSpecies (String name) throws IOException {
+		return getSpecies(name, false);
+	}
+    
+    public List<Species> getSpecies (String name, boolean exact) throws IOException {
 		List<Species> results = new ArrayList<>();
 		
 		name = name.replaceAll("\n", " ");
+		
+		if (exact) name += "[]";
 		
 		String encodedName = URLEncoder.encode(name, StandardCharsets.UTF_8);
 

@@ -61,8 +61,11 @@ public class CFGCurationApplication {
 			//service.createPublications();
 			//service.createMappingTables();
 			//service.addInformationToMappingTables();
-			service.addPMIDs();
+			//service.addPMIDs();
+			//service.generateExcelFiles();
+			//service.regenerateScientificNameMapping();
 			service.generateExcelFiles();
+			service.generateMappedExcel();
 		}
 		
 	}

@@ -15,6 +15,25 @@ public class MappingScientificName extends Mapping {
 	@Column
 	String rank;
 	
+	@Column
+	String namespaceName2;
+	
+	@Column
+	String namespaceId2;
+	
+	public String getNamespaceName2() {
+		return namespaceName2;
+	}
+	public void setNamespaceName2(String namespaceName2) {
+		this.namespaceName2 = namespaceName2;
+	}
+	public String getNamespaceId2() {
+		return namespaceId2;
+	}
+	public void setNamespaceId2(String namespaceId2) {
+		this.namespaceId2 = namespaceId2;
+	}
+	
 	public String getRank() {
 		return rank;
 	}

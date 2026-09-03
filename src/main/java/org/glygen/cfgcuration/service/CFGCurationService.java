@@ -332,6 +332,39 @@ public class CFGCurationService {
 	}
 	
 	@Transactional
+	public void regenerateScientificNameMapping() {
+		PubmedUtil util = new PubmedUtil(apiKey);
+		
+		List<MappingScientificName> allBS = mappingSpeciesRepository.findAll();
+		for (MappingScientificName bs: allBS) {
+			try {
+				if (bs.getName() == null) continue;
+				List<Species> matches = util.getSpecies(bs.getName(), true);
+				if (!matches.isEmpty()) {
+					if (matches.size() > 1) {
+						logger.info("multiple matches for " + bs.getName());
+					} else {
+						Species s = matches.get(0);
+						bs.setNamespaceName2(s.getName());
+						bs.setNamespaceId2(s.getId());
+						mappingSpeciesRepository.save(bs);
+					}
+				}
+				
+				try {
+			        Thread.sleep(100); // wait 100 milliseconds between requests
+			    } catch (InterruptedException e) {
+			        Thread.currentThread().interrupt(); // restore interrupted status
+			    }
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		
+	}
+	
+	@Transactional
 	public void createMappingTables () {
 		long c = mappingSpeciesRepository.count();
 		if (c == 0) {
@@ -911,13 +944,13 @@ public class CFGCurationService {
 		String[] header = {"ID", "count", "name", "namespacename", "namespaceid", "mappingname", "rank", "matchCount"};
 		rows.add(header);
 		for (MappingScientificName m: allSpecies) {
-			if (m.getNamespaceName() != null) {
+			if (m.getNamespaceName2() != null) {
 				String[] row = new String[8];
 				row[0] = m.getId()+"";
 				row[1] = m.getCount()+ "";
 				row[2] = m.getName();
-				row[3] = m.getNamespaceName();
-				row[4] = m.getNamespaceId();
+				row[3] = m.getNamespaceName2();
+				row[4] = m.getNamespaceId2();
 				row[5] = m.getMappingName();
 				row[6] = m.getRank();
 				row[7] = m.getMatchCount() + "";
@@ -948,6 +981,86 @@ public class CFGCurationService {
 			writeToExcel (rows, "Mappings", "mapping_ScientificName-mapped.xlsx", recordRows, "records");
 		} catch (IOException e1) {
 			logger.error("Error generating Excel file for Species", e1);
+		}
+		
+		// Tissue mappings
+		rows = new ArrayList<>();
+		List<MappingTissue> allRows = mappingTissueRepository.findAll();
+		recordMap = new HashMap<>();
+		rows.add(header);
+		for (MappingTissue m: allRows) {
+			if (m.getNamespaceName() != null) {
+				String[] row = new String[8];
+				row[0] = m.getId()+"";
+				row[1] = m.getCount()+ "";
+				row[2] = m.getName();
+				row[7] = m.getMatchCount() + "";
+				// find records with this value
+				List<Biological> bsList = bioRepository.findByTissueIgnoreCase(m.getName());
+				Set<String> recordList = new HashSet<>();
+				for (Biological bs: bsList) {
+					String cc = bs.getCarbId();
+					recordList.add(cc);
+				}
+				recordMap.put(m.getId(), new ArrayList<>(recordList));
+				rows.add(row);
+			}
+		}
+		recordRows = new ArrayList<>();
+		recordRows.add(rHeader);
+		for (Long id: recordMap.keySet()) {
+			List<String> records = recordMap.get(id);
+			for (String cc: records) {
+				String[] row = new String[2];
+				row[0] = id+"";
+				row[1] = cc;
+				recordRows.add(row);
+			}
+		}
+		try {
+			writeToExcel (rows, "Mappings", "mapping_Tissue-mapped.xlsx", recordRows, "records");
+		} catch (IOException e1) {
+			logger.error("Error generating Excel file for Tissues", e1);
+		}
+		
+		// Disease Name Mappings
+		recordMap = new HashMap<>();
+		rows = new ArrayList<>();
+		List<MappingDisease> allDisease = mappingDiseaseRepository.findAll();
+		rows.add(header);
+		for (MappingDisease m: allDisease) {
+			if (m.getNamespaceName() != null) {
+				String[] row = new String[8];
+				row[0] = m.getId()+"";
+				row[1] = m.getCount()+ "";
+				row[2] = m.getName();
+				row[7] = m.getMatchCount() + "";
+				// find records with this value
+				List<Biological> bsList = bioRepository.findByDiseaseIgnoreCase(m.getName());
+				Set<String> recordList = new HashSet<>();
+				for (Biological bs: bsList) {
+					String cc = bs.getCarbId();
+					recordList.add(cc);
+				}
+				recordMap.put(m.getId(), new ArrayList<>(recordList));
+				rows.add(row);
+			}
+		}
+		recordRows = new ArrayList<>();
+		recordRows.add(rHeader);
+		for (Long id: recordMap.keySet()) {
+			List<String> records = recordMap.get(id);
+			for (String cc: records) {
+				String[] row = new String[2];
+				row[0] = id+"";
+				row[1] = cc;
+				recordRows.add(row);
+			}
+		}
+		try {
+			writeToExcel (rows, "Mappings", "mapping_Disease-mapped.xlsx", recordRows, "records");
+		} catch (IOException e1) {
+			logger.error("Error generating Excel file for Diseases", e1);
 		}
 	}
 
@@ -1001,7 +1114,7 @@ public class CFGCurationService {
 		List<MappingScientificName> allSpecies = mappingSpeciesRepository.findAll();
 		rows.add(header);
 		for (MappingScientificName m: allSpecies) {
-			if (m.getNamespaceName() == null) {
+			if (m.getNamespaceName2() == null) {
 				String[] row = new String[8];
 				row[0] = m.getId()+"";
 				row[1] = m.getCount()+ "";
